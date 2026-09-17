@@ -24,6 +24,15 @@ pnpm-debug.log*
 # Test / coverage
 coverage/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Local scratch / PDF extraction artifacts (not part of the product)
+extract.js
+extract2.js
+spec.txt
+spec2.txt
+
 # Env
 .env
 .env.*
