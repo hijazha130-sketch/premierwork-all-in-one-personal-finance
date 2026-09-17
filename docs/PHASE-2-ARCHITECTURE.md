@@ -99,8 +99,9 @@ What the research establishes for Phase 2:
   verification).
 - **The frequency set is fixed and small.** From `RECURRING` cols AP25:AR33: *One time, Every Week
   (+7 days), Every 2 Weeks (+14), Every 4 Weeks (+28), Every Month, Every 2 Months, Every Quarter,
-  Every 6 Months, Every Year.* Week-based frequencies add fixed days with a per-year cap (52/26/13);
-  month-based frequencies step by whole months.
+  Every 6 Months, Every Year.* Week-based frequencies add fixed days; month-based frequencies step
+  by whole months. (The sheet's PAYMENTS also showed per-year counts of 52/26/13, but that was its
+  fixed row budget — a spreadsheet-mechanics artifact — not a product rule; see the note in §8.1.)
 - **PAYMENTS is a derived schedule, not source data.** It expands each RECURRING definition into
   individual dated occurrences (~10,800 pre-provisioned rows, mostly empty). This is presentation/
   spreadsheet-mechanics — in software it becomes an on-demand computed list, never a stored table.
@@ -190,9 +191,9 @@ matching Phase 1. New records carry the existing `BaseRecord` (`id`, `createdAt`
 ```ts
 export type RecurringFrequency =
   | "oneTime"
-  | "everyWeek"      // +7 days,  cap 52/yr
-  | "every2Weeks"    // +14 days, cap 26/yr
-  | "every4Weeks"    // +28 days, cap 13/yr
+  | "everyWeek"      // +7 days
+  | "every2Weeks"    // +14 days
+  | "every4Weeks"    // +28 days
   | "everyMonth"     // +1 month
   | "every2Months"   // +2 months
   | "everyQuarter"   // +3 months
@@ -281,11 +282,17 @@ Every Phase 2 calculation is a **pure function** in `src/domain/*`, following th
 
 - **Input:** a `RecurringRule`, a `DateRange` horizon (`from`, `to`).
 - **Logic (verified against source):** start at `anchorDate`. For `oneTime`, emit the anchor only.
-  For week-based (`everyWeek`/`every2Weeks`/`every4Weeks`), step by +7/+14/+28 days, not exceeding the
-  yearly cap (52/26/13) within any rolling 12-month window. For month-based, step by whole months
+  For week-based (`everyWeek`/`every2Weeks`/`every4Weeks`), step by +7/+14/+28 days and emit **every**
+  occurrence in range — there is no artificial per-year cap. For month-based, step by whole months
   (+1/+2/+3/+6/+12), **clamping** a day that overflows a short month to that month's last day (e.g. an
   anchor on the 31st → Feb 28/29). Emit dates that fall within `[from, to]` and on/before `endDate`
   (if set). Never emit past `endDate`.
+- **Founder decision (2026-09-17):** the spreadsheet's 52/26/13 per-year counts were its fixed
+  row-budget artifact, **not** a financial rule, so they are **not** applied. A weekly commitment can
+  legitimately fall 53 times in a 365-day span; dropping one would undercount commitments and misstate
+  Safe to Spend / cash-flow. Generation is bounded only by the requested range and the rule's
+  `endDate`; a hard iteration limit is an engineering guard against runaway open-ended loops, never a
+  product cap.
 - **Output:** `IsoDate[]` (ascending), plus a `nextOccurrence(rule, fromDateInclusive)` helper.
 - **Consumer:** occurrence-status engine, calendar, cash-flow.
 
@@ -576,11 +583,12 @@ Financially load-bearing Phase 2 calculations. A wrong result here misstates mon
 
 1. **Recurrence date generation** (`recurrence.ts`).
    - Source: RECURRING frequency table (verified); stepping pattern verified at `AP85`.
-   - Expected: correct dates per frequency, respecting anchor, yearly caps, end date, month clamping.
+   - Expected: correct dates per frequency, respecting anchor, end date, month clamping.
    - Edge cases: month-end anchors (31st) into short months; leap Feb 29; end date exactly on an
-     occurrence; `oneTime`; day-based caps across a year boundary; DST is not a factor (day-precision).
-   - Test: golden cases per frequency; boundary dates; end-date inclusivity.
-   - Inaccuracy risk: off-by-one on interval or cap → missed or extra bills, wrong Safe to Spend.
+     occurrence; `oneTime`; a weekly rule yielding 53 occurrences in a year (all kept); DST is not a
+     factor (day-precision).
+   - Test: golden cases per frequency; boundary dates; end-date inclusivity; full-year weekly count.
+   - Inaccuracy risk: off-by-one on interval → missed or extra bills, wrong Safe to Spend.
 2. **Occurrence status matching (paid detection)** (`occurrences.ts`).
    - Source: DASHBOARD TODAY() logic (concept); matching is new but deterministic.
    - Expected: an occurrence is `paid` iff a transaction with the same `recurringRuleId` +
@@ -630,8 +638,12 @@ Financially load-bearing Phase 2 calculations. A wrong result here misstates mon
   gate occurrence-paid detection too (default: a transaction counts as fulfilling an occurrence
   regardless of cleared, but only cleared ones move the balance).
 - **Timezone / date drift:** none — day-precision ISO strings and injected `today`, matching Phase 1.
-- **Very long horizons:** cap generation to a sane window (e.g. 24 months) to bound computation; the
-  calendar only needs the visible month, cash-flow only its horizon.
+- **Weekly counts across a year:** emit every occurrence in range. A weekly item can legitimately
+  fall 53 times in a 365-day span, so there is **no** 52/26/13 cap (that was a spreadsheet
+  row-budget artifact). Only the requested range and `endDate` bound generation.
+- **Very long horizons:** generation is bounded by the requested range and `endDate`; a hard
+  iteration guard (not a product cap) prevents runaway loops on open-ended rules. Callers pass a
+  bounded window — the calendar only needs the visible month, cash-flow only its horizon.
 
 ---
 
@@ -640,7 +652,7 @@ Financially load-bearing Phase 2 calculations. A wrong result here misstates mon
 Weighted toward the engines, per the Blueprint. New test files mirror the Phase 1 layout in `tests/`.
 
 - **`tests/recurrence.test.ts`** — golden cases for every frequency; anchor/end-date boundaries;
-  month-end clamping; leap Feb; yearly caps; `oneTime`; `nextOccurrence`.
+  month-end clamping; leap Feb; a full-year weekly count (53, no cap); `oneTime`; `nextOccurrence`.
 - **`tests/occurrences.test.ts`** — status matrix (upcoming/overdue/paid/skipped/adjusted); paid
   detection by `occurrenceDate`; delete-returns-to-unpaid; dedupe of double payments.
 - **`tests/cashflow.test.ts`** — running-balance projection vs hand-computed fixtures; unpaid-only
@@ -692,7 +704,8 @@ until this blueprint is approved.
 - Files: `src/domain/recurrence.ts` (+ `tests/recurrence.test.ts`).
 - Logic: `generateOccurrences(rule, range)`, `nextOccurrence(rule, from)` per Section 8.1.
 - UI: none. Tests: golden cases per Section 16.
-- Acceptance: all recurrence golden tests pass, including month-end clamp and caps.
+- Acceptance: all recurrence golden tests pass, including month-end clamp and full-range weekly
+  generation (no artificial cap).
 - Depends on: Step 1 (types). Risk: date math — golden-tested.
 
 **Step 4 — Occurrence status engine.**
@@ -796,7 +809,7 @@ Phase 2 is done when all hold:
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Recurrence date math wrong (clamping, caps) | Missed/extra bills; wrong Safe to Spend | Golden tests per frequency + boundary cases; verified against source |
+| Recurrence date math wrong (clamping, stepping) | Missed/extra bills; wrong Safe to Spend | Golden tests per frequency + boundary cases (incl. full-year weekly count) |
 | Occurrence↔transaction mismatch | Double-count or bill still nagging after paid | Match strictly on `recurringRuleId`+`occurrenceDate`; status-matrix tests |
 | Safe to Spend window undefined | Misleading headline number | FD-1/FD-2 resolved before Step 5; conservative default; show reserved breakdown |
 | Second-ledger creep (storing occurrences) | Divergence, the spreadsheet's core defect | Occurrences never stored; only rules + overrides + transactions are persisted |
