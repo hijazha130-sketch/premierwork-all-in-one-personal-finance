@@ -79,6 +79,7 @@ describe("Safe to Spend (§8.4) — default endOfMonth", () => {
 
     expect(r.horizonEnd).toBe("2026-06-30");
     expect(r.reserved.map((o) => o.amount)).toEqual([10000_00, 30000_00]);
+    expect(r.reservedTotal).toBe(40000_00);
     expect(r.amount).toBe(60000_00); // 100,000 - 10,000 - 30,000
   });
 

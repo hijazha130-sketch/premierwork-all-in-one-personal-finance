@@ -81,6 +81,7 @@ export interface SafeToSpendConfig {
 export interface SafeToSpendResult {
   amount: Minor; // MAY be negative — returned honestly, never clamped (§15)
   reserved: Occurrence[]; // the unpaid out-commitments subtracted (for a breakdown)
+  reservedTotal: Minor; // Σ of the reserved commitments (for a one-line "set aside" note)
   horizonEnd: IsoDate; // the last day considered
 }
 
@@ -108,14 +109,15 @@ export function safeToSpend(
     .filter((o) => o.direction === "out" && o.date <= horizonEnd)
     .sort(byScheduledDate);
 
-  let amount = subMinor(balance, sumMinor(reserved.map((o) => o.amount)));
+  const reservedTotal = sumMinor(reserved.map((o) => o.amount));
+  let amount = subMinor(balance, reservedTotal);
 
   if (config.creditExpectedIncome) {
     const expectedIn = unpaid.filter((o) => o.direction === "in" && o.date <= horizonEnd);
     amount = addMinor(amount, sumMinor(expectedIn.map((o) => o.amount)));
   }
 
-  return { amount, reserved, horizonEnd };
+  return { amount, reserved, reservedTotal, horizonEnd };
 }
 
 /** Resolve the horizon's last day from the chosen mode (FD-1). */

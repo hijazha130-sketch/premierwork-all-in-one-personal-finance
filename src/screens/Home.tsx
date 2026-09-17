@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { useData } from "@/state/DataProvider";
+import { useData, useCurrency } from "@/state/DataProvider";
 import { useCapture } from "@/state/CaptureProvider";
 import { Button, Card } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { EmptyState } from "@/components/EmptyState";
 import { RecentActivity } from "@/components/RecentActivity";
 import { monthLabel, currentMonth } from "@/lib/period";
+import type { Occurrence } from "@/domain/occurrences";
 
 function greeting(now = new Date()): string {
   const h = now.getHours();
@@ -14,13 +15,21 @@ function greeting(now = new Date()): string {
   return "Good evening";
 }
 
+function shortDate(iso: string, locale: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, { day: "numeric", month: "short" });
+}
+
 /**
- * Home (Section 8). The daily landing screen. In Phase 1 it shows the honest
- * current picture: total money across accounts, money in / out this month, and
- * recent activity. (Full "Safe to spend" arrives with Phase 2's upcoming bills.)
+ * Home (Section 8 & Phase 2 §11). The daily habit screen: a Safe to spend hero
+ * (with the total balance as secondary context), a Needs attention block for
+ * overdue bills (shown only when any exist), an Upcoming block, plus this
+ * month's money in/out and recent activity. Every value is read from derived.* —
+ * the screen does no money math and calls no engine (invariant #9).
  */
 export function Home() {
-  const { accounts, transactions, derived } = useData();
+  const { accounts, transactions, derived, recurringRulesById } = useData();
+  const { locale } = useCurrency();
   const { openCapture } = useCapture();
   const month = monthLabel(currentMonth());
 
@@ -45,7 +54,16 @@ export function Home() {
     );
   }
 
+  const safe = derived.safeToSpend;
+  const negative = safe.amount < 0;
+  const overdue = derived.overdue;
+  const upcoming = derived.upcoming.slice(0, 5);
   const hasActivity = transactions.length > 0;
+
+  const nameOf = (o: Occurrence): string => {
+    const found = recurringRulesById.get(o.ruleId)?.name;
+    return found ?? (o.direction === "in" ? "Money coming in" : "A bill");
+  };
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -54,18 +72,44 @@ export function Home() {
         <h1 className="font-serif text-3xl md:text-4xl italic text-ink">{greeting()}, there</h1>
       </div>
 
-      {/* Hero: money right now */}
-      <Card className="relative overflow-hidden">
-        <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-3">Money right now</div>
-        <MoneyAmount amount={derived.total} size="hero" />
-        <p className="text-muted mt-4 max-w-md">
-          Everything across your accounts, added up. Every figure here is built straight from what
-          you record — nothing to maintain.
+      {/* Hero: Safe to spend */}
+      <Card>
+        <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-3">Safe to spend today</div>
+        <MoneyAmount amount={safe.amount} size="hero" tone={negative ? "attention" : "default"} />
+        <p className="text-muted mt-3">
+          <MoneyAmount amount={derived.total} size="sm" tone="muted" /> across your accounts.
+          {negative ? " Your upcoming bills add up to more than you have right now." : ""}
         </p>
+        {safe.reservedTotal > 0 && (
+          <p className="text-sm text-muted mt-1">
+            <MoneyAmount amount={safe.reservedTotal} size="sm" tone="muted" /> set aside for what's coming this month.
+          </p>
+        )}
         <div className="mt-6">
           <Button onClick={() => openCapture("expense")}>+ Log a spend</Button>
         </div>
       </Card>
+
+      {/* Needs attention (overdue) — only when there is something */}
+      {overdue.length > 0 && (
+        <Card className="border-attention/40">
+          <h2 className="font-serif text-xl text-ink mb-1">What needs attention</h2>
+          <p className="text-sm text-muted mb-4">
+            {overdue.length === 1 ? "One bill is" : `${overdue.length} bills are`} past due.
+          </p>
+          <div className="divide-y divide-hairline">
+            {overdue.map((o, i) => (
+              <div key={i} className="flex items-center gap-4 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-ink font-medium">{nameOf(o)}</span>
+                  <span className="block text-xs text-attention">was due {shortDate(o.displayDate, locale)}</span>
+                </span>
+                <MoneyAmount amount={o.amount} size="sm" tone={o.direction === "in" ? "positive" : "attention"} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* This month in / out */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -82,6 +126,29 @@ export function Home() {
           <MoneyAmount amount={derived.monthOut} size="lg" tone="attention" />
         </Card>
       </div>
+
+      {/* Upcoming */}
+      {upcoming.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-serif text-xl text-ink">Coming up</h2>
+            <Link to="/money" className="text-sm text-gold hover:underline">
+              See calendar
+            </Link>
+          </div>
+          <div className="divide-y divide-hairline">
+            {upcoming.map((o, i) => (
+              <div key={i} className="flex items-center gap-4 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-ink font-medium">{nameOf(o)}</span>
+                  <span className="block text-xs text-muted">Coming up · {shortDate(o.displayDate, locale)}</span>
+                </span>
+                <MoneyAmount amount={o.amount} size="sm" tone={o.direction === "in" ? "positive" : "default"} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Recent activity or a directive prompt */}
       {hasActivity ? (
