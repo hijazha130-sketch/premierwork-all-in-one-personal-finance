@@ -15,7 +15,12 @@ import type {
   BaseRecord,
   Category,
   IncomeSource,
+  IsoDate,
+  Minor,
+  OverrideAction,
   Person,
+  RecurringOverride,
+  RecurringRule,
   Settings,
   Transaction,
 } from "@/domain/types";
@@ -289,6 +294,180 @@ export class FinanceRepository {
     const inRec = stampNew<Transaction>({ ...base, direction: "in", accountId: input.toAccountId });
     await this.db.transactions.bulkPut([outRec, inRec]);
     return { out: outRec, in: inRec };
+  }
+
+  // --- Recurring rules (Phase 2) ------------------------------------------
+  // A rule is a *definition* of a repeating bill/income — never money by itself.
+  // Occurrences are still computed, never stored (that arrives in later steps).
+
+  async listRecurringRules(includeArchived = false): Promise<RecurringRule[]> {
+    const all = await this.db.recurringRules.toArray();
+    return includeArchived ? all : all.filter((r) => !r.archived);
+  }
+
+  async getRecurringRule(id: string): Promise<RecurringRule | undefined> {
+    return this.db.recurringRules.get(id);
+  }
+
+  /**
+   * Create a recurring rule. Integrity mirrors transactions: the account must
+   * exist, and the group/person must exist when set (reuses assertReferences —
+   * a rule's type is always expense/income, never transfer).
+   */
+  async createRecurringRule(
+    data: Omit<RecurringRule, keyof BaseRecord | "active" | "archived" | "goalId" | "debtId" | "investmentId"> &
+      Partial<Pick<RecurringRule, "active" | "archived" | "goalId" | "debtId" | "investmentId">>,
+  ): Promise<RecurringRule> {
+    const rec = stampNew<RecurringRule>({
+      active: true,
+      archived: false,
+      goalId: null,
+      debtId: null,
+      investmentId: null,
+      ...data,
+    });
+    await this.assertReferences({
+      accountId: rec.accountId,
+      categoryId: rec.categoryId,
+      personId: rec.personId,
+      type: rec.type,
+    });
+    await this.db.recurringRules.put(rec);
+    return rec;
+  }
+
+  async updateRecurringRule(id: string, patch: Partial<RecurringRule>): Promise<void> {
+    const existing = await this.db.recurringRules.get(id);
+    if (!existing) throw new IntegrityError("That repeating item no longer exists.");
+    const merged = { ...existing, ...patch };
+    await this.assertReferences({
+      accountId: merged.accountId,
+      categoryId: merged.categoryId,
+      personId: merged.personId,
+      type: merged.type,
+    });
+    await this.db.recurringRules.update(id, { ...patch, updatedAt: Date.now() });
+  }
+
+  /** Pause a rule (generates no future occurrences); reversible with resume. */
+  async pauseRecurringRule(id: string): Promise<void> {
+    await this.updateRecurringRule(id, { active: false });
+  }
+  async resumeRecurringRule(id: string): Promise<void> {
+    await this.updateRecurringRule(id, { active: true });
+  }
+
+  /**
+   * Archive a rule (drops it from active lists but keeps it — and its linked
+   * transactions — for history). The rule still exists, so its overrides are not
+   * orphaned; they are inert while the rule generates nothing.
+   */
+  async archiveRecurringRule(id: string): Promise<void> {
+    await this.updateRecurringRule(id, { archived: true });
+  }
+
+  /** True when any transaction was recorded against this rule. */
+  async isRecurringRuleInUse(id: string): Promise<boolean> {
+    const count = await this.db.transactions.where("recurringRuleId").equals(id).count();
+    return count > 0;
+  }
+
+  /**
+   * Hard-delete a rule only when no transaction references it — otherwise throw
+   * (caller should archive), mirroring the dimension archive-vs-delete rule.
+   * On a successful hard-delete, its overrides are removed so none are orphaned.
+   */
+  async deleteRecurringRule(id: string): Promise<void> {
+    if (await this.isRecurringRuleInUse(id)) {
+      throw new IntegrityError("This repeating item has recorded payments — archive it instead.");
+    }
+    await this.db.recurringOverrides.where("ruleId").equals(id).delete();
+    await this.db.recurringRules.delete(id);
+  }
+
+  // --- Recurring overrides (exceptions only) ------------------------------
+
+  async listRecurringOverrides(ruleId?: string): Promise<RecurringOverride[]> {
+    if (ruleId) return this.db.recurringOverrides.where("ruleId").equals(ruleId).toArray();
+    return this.db.recurringOverrides.toArray();
+  }
+
+  async getOverride(ruleId: string, occurrenceDate: IsoDate): Promise<RecurringOverride | undefined> {
+    return this.db.recurringOverrides.where("[ruleId+occurrenceDate]").equals([ruleId, occurrenceDate]).first();
+  }
+
+  /**
+   * Create or update the single override for a given (ruleId, occurrenceDate).
+   * Uniqueness is enforced by updating in place when one already exists, so a
+   * second call never duplicates. "skip" carries no adjusted fields; "adjust"
+   * carries the changed amount and/or date.
+   */
+  async createOrUpdateOverride(input: {
+    ruleId: string;
+    occurrenceDate: IsoDate;
+    action: OverrideAction;
+    adjustedAmount?: Minor;
+    adjustedDate?: IsoDate;
+  }): Promise<RecurringOverride> {
+    const existing = await this.getOverride(input.ruleId, input.occurrenceDate);
+    const now = Date.now();
+    const rec: RecurringOverride = {
+      id: existing?.id ?? newId(),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      ruleId: input.ruleId,
+      occurrenceDate: input.occurrenceDate,
+      action: input.action,
+      ...(input.action === "adjust"
+        ? {
+            ...(input.adjustedAmount !== undefined ? { adjustedAmount: input.adjustedAmount } : {}),
+            ...(input.adjustedDate !== undefined ? { adjustedDate: input.adjustedDate } : {}),
+          }
+        : {}),
+    };
+    await this.db.recurringOverrides.put(rec);
+    return rec;
+  }
+
+  async deleteOverride(ruleId: string, occurrenceDate: IsoDate): Promise<void> {
+    const existing = await this.getOverride(ruleId, occurrenceDate);
+    if (existing) await this.db.recurringOverrides.delete(existing.id);
+  }
+
+  // --- Occurrence → transaction (the only way a rule becomes money) --------
+
+  /**
+   * Turn a confirmed occurrence into a real Transaction through the existing
+   * createTransaction path (never a direct table write). Sets source:"recurring"
+   * and links back to the rule + the scheduled occurrence date. An "adjust"
+   * override changes the amount and/or the actual date, but the transaction's
+   * occurrenceDate stays the ORIGINAL scheduled date so paid-detection matches on
+   * it (Architecture §15). Runs on manual confirmation only (FD-3); the UI wires
+   * it in Step 10. cleared is independent of fulfilment (FD-5).
+   */
+  async createTransactionFromOccurrence(
+    rule: RecurringRule,
+    occurrenceDate: IsoDate,
+    opts?: { cleared?: boolean; note?: string; override?: RecurringOverride },
+  ): Promise<Transaction> {
+    const override = opts?.override ?? (await this.getOverride(rule.id, occurrenceDate));
+    const adjusting = override?.action === "adjust";
+    const amount = adjusting && override?.adjustedAmount != null ? override.adjustedAmount : rule.amount;
+    const date = adjusting && override?.adjustedDate != null ? override.adjustedDate : occurrenceDate;
+    return this.createTransaction({
+      date,
+      amount,
+      direction: rule.direction,
+      type: rule.type,
+      categoryId: rule.categoryId,
+      accountId: rule.accountId,
+      personId: rule.personId,
+      source: "recurring",
+      note: opts?.note,
+      cleared: opts?.cleared ?? true,
+      recurringRuleId: rule.id,
+      occurrenceDate, // the scheduled date it fulfills (matches even if paid early/late)
+    });
   }
 }
 
