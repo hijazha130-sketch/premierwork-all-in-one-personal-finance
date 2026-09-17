@@ -1,0 +1,259 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useData } from "@/state/DataProvider";
+import { Button, Card, Field, SelectInput, TextInput } from "@/components/ui";
+import { defaultCategoryInputs } from "@/data/seed";
+import { parseMajorToMinor } from "@/lib/money";
+import type { AccountType } from "@/domain/types";
+
+/**
+ * Setup — the first-run wizard (Section 8). A short, guided sequence, one
+ * decision per step: currency → accounts → people (optional) → groups → income
+ * (optional). Progress indicator, Back on every step, Skip on optional steps.
+ * Finishing lands the user on Home.
+ */
+type DraftAccount = { name: string; type: AccountType; balance: string };
+type DraftPerson = { name: string };
+type DraftIncome = { name: string; amount: string };
+
+const CURRENCIES = [
+  { code: "PKR", symbol: "Rs", locale: "en-PK" },
+  { code: "USD", symbol: "$", locale: "en-US" },
+  { code: "GBP", symbol: "£", locale: "en-GB" },
+  { code: "EUR", symbol: "€", locale: "en-IE" },
+  { code: "INR", symbol: "₹", locale: "en-IN" },
+  { code: "AED", symbol: "AED", locale: "en-AE" },
+];
+
+const STEPS = ["Currency", "Accounts", "People", "Groups", "Income"];
+
+export function Setup() {
+  const { repo } = useData();
+  const navigate = useNavigate();
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  const [currency, setCurrency] = useState(CURRENCIES[0]);
+  const [accounts, setAccounts] = useState<DraftAccount[]>([{ name: "", type: "checking", balance: "" }]);
+  const [people, setPeople] = useState<DraftPerson[]>([]);
+  const [groups, setGroups] = useState(() => defaultCategoryInputs().map((c) => ({ ...c, on: true })));
+  const [incomes, setIncomes] = useState<DraftIncome[]>([]);
+  const [error, setError] = useState("");
+
+  const validAccounts = accounts.filter((a) => a.name.trim());
+
+  function next() {
+    setError("");
+    if (step === 1 && validAccounts.length === 0) {
+      setError("Add at least one account to continue.");
+      return;
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  }
+  function back() {
+    setError("");
+    setStep((s) => Math.max(s - 1, 0));
+  }
+
+  async function finish() {
+    setBusy(true);
+    try {
+      await repo.saveSettings({
+        currencyCode: currency.code,
+        currencySymbol: currency.symbol,
+        locale: currency.locale,
+        setupComplete: true,
+      });
+      for (const a of validAccounts) {
+        await repo.createAccount({
+          name: a.name.trim(),
+          type: a.type,
+          openingBalance: parseMajorToMinor(a.balance || "0") ?? 0,
+          currencyCode: currency.code,
+          archived: false,
+        });
+      }
+      for (const p of people.filter((p) => p.name.trim())) {
+        await repo.createPerson({ name: p.name.trim(), archived: false });
+      }
+      for (const g of groups.filter((g) => g.on)) {
+        await repo.createCategory({
+          name: g.name,
+          bucket: g.bucket,
+          needsWantsSavings: g.needsWantsSavings,
+          color: g.color,
+          archived: false,
+        });
+      }
+      for (const inc of incomes.filter((i) => i.name.trim())) {
+        await repo.createIncomeSource({
+          name: inc.name.trim(),
+          defaultAmount: inc.amount ? parseMajorToMinor(inc.amount) ?? undefined : undefined,
+          archived: false,
+        });
+      }
+      navigate("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Setup couldn't finish.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Progress */}
+      <div className="flex items-center gap-2">
+        {STEPS.map((label, i) => (
+          <div key={label} className="flex-1">
+            <div className={`h-1.5 rounded-full ${i <= step ? "bg-gold" : "bg-inset"}`} />
+            <div className={`mt-2 text-[11px] ${i === step ? "text-ink font-medium" : "text-muted"}`}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <Card>
+        {step === 0 && (
+          <StepShell title="Pick your currency" blurb="This is how every amount shows up across the app.">
+            <Field label="Currency">
+              <SelectInput
+                value={currency.code}
+                onChange={(e) => setCurrency(CURRENCIES.find((c) => c.code === e.target.value) ?? CURRENCIES[0])}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.symbol} — {c.code}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <p className="text-sm text-muted">Amounts will look like <span className="font-amount text-ink">{currency.symbol} 1,250</span>.</p>
+          </StepShell>
+        )}
+
+        {step === 1 && (
+          <StepShell title="Add your accounts" blurb="Where your money lives — an everyday account, savings, cash. You can add more later.">
+            <div className="space-y-3">
+              {accounts.map((a, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <TextInput placeholder="e.g. Everyday" value={a.name} onChange={(e) => setAccounts(upd(accounts, i, { name: e.target.value }))} />
+                  </div>
+                  <div className="col-span-4">
+                    <SelectInput value={a.type} onChange={(e) => setAccounts(upd(accounts, i, { type: e.target.value as AccountType }))}>
+                      <option value="checking">Everyday</option>
+                      <option value="savings">Savings</option>
+                      <option value="cash">Cash</option>
+                      <option value="credit">Credit card</option>
+                      <option value="investment">Investment</option>
+                      <option value="loan">Loan</option>
+                    </SelectInput>
+                  </div>
+                  <div className="col-span-3">
+                    <TextInput inputMode="decimal" placeholder="Balance" value={a.balance} onChange={(e) => setAccounts(upd(accounts, i, { balance: e.target.value }))} />
+                  </div>
+                </div>
+              ))}
+              <button className="text-sm text-gold hover:underline" onClick={() => setAccounts([...accounts, { name: "", type: "checking", balance: "" }])}>
+                + Add another account
+              </button>
+            </div>
+          </StepShell>
+        )}
+
+        {step === 2 && (
+          <StepShell title="Who spends in your household?" blurb="Optional. Add household members to track who spent what. You can skip this.">
+            <div className="space-y-3">
+              {people.map((p, i) => (
+                <TextInput key={i} placeholder="Name" value={p.name} onChange={(e) => setPeople(upd(people, i, { name: e.target.value }))} />
+              ))}
+              <button className="text-sm text-gold hover:underline" onClick={() => setPeople([...people, { name: "" }])}>
+                + Add a person
+              </button>
+            </div>
+          </StepShell>
+        )}
+
+        {step === 3 && (
+          <StepShell title="How your money is grouped" blurb="We've filled in sensible groups. Keep the ones you want — you can edit all of these later.">
+            <div className="flex flex-wrap gap-2">
+              {groups.map((g, i) => (
+                <button
+                  key={g.name}
+                  onClick={() => setGroups(upd(groups, i, { on: !g.on }))}
+                  className={`inline-flex items-center gap-2 rounded-pill border px-3 py-2 text-sm ${
+                    g.on ? "border-gold text-ink bg-gold/10" : "border-hairline text-muted"
+                  }`}
+                >
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: g.color }} aria-hidden />
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          </StepShell>
+        )}
+
+        {step === 4 && (
+          <StepShell title="Where your money comes from" blurb="Optional. Add income sources for faster entry later — like Salary. You can skip this.">
+            <div className="space-y-3">
+              {incomes.map((inc, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2">
+                  <div className="col-span-7">
+                    <TextInput placeholder="e.g. Salary" value={inc.name} onChange={(e) => setIncomes(upd(incomes, i, { name: e.target.value }))} />
+                  </div>
+                  <div className="col-span-5">
+                    <TextInput inputMode="decimal" placeholder="Usual amount (optional)" value={inc.amount} onChange={(e) => setIncomes(upd(incomes, i, { amount: e.target.value }))} />
+                  </div>
+                </div>
+              ))}
+              <button className="text-sm text-gold hover:underline" onClick={() => setIncomes([...incomes, { name: "", amount: "" }])}>
+                + Add an income source
+              </button>
+            </div>
+          </StepShell>
+        )}
+
+        {error && <p className="text-sm text-attention mt-4">{error}</p>}
+
+        <div className="flex items-center justify-between mt-8">
+          <div>
+            {step > 0 && (
+              <Button variant="quiet" onClick={back} disabled={busy}>
+                Back
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {(step === 2 || step === 4) && (
+              <Button variant="ghost" onClick={step === 4 ? finish : next} disabled={busy}>
+                Skip
+              </Button>
+            )}
+            {step < STEPS.length - 1 ? (
+              <Button onClick={next} disabled={busy}>
+                Continue
+              </Button>
+            ) : (
+              <Button onClick={finish} disabled={busy}>
+                {busy ? "Setting up…" : "Finish"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function StepShell({ title, blurb, children }: { title: string; blurb: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h1 className="font-serif text-2xl text-ink">{title}</h1>
+      <p className="text-muted mt-2 mb-6">{blurb}</p>
+      {children}
+    </div>
+  );
+}
+
+function upd<T>(list: T[], i: number, patch: Partial<T>): T[] {
+  return list.map((item, idx) => (idx === i ? { ...item, ...patch } : item));
+}

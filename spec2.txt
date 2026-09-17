@@ -1,0 +1,468 @@
+ALL-IN-ONE PERSONAL FINANCE —
+Phase 0 + Phase 1 Build Specification
+2026-09-17 · @Someone
+This is the implementation-ready specification for the first two build phases — Phase 0
+(Foundation) and Phase 1 (Financial Core, the transaction spine). It inherits the locked,
+approved Final Product Blueprint and its verified financial rules; it does not re-open any
+architecture decision. Its job is to give whoever builds (Cowork, or an app builder such as
+Lovable) everything needed to implement these two phases without re-deriving strategy:
+the stack, the data layer, the theme tokens, the concrete Phase 1 schema, the internal
+logic modules, the screens in customer language, the interactions, and objective
+acceptance criteria. Code is the next step after this spec is approved — no application
+code is written here. When Phase 1 is done, the product is already a clean, usable money
+tracker; Phases 2–6 build on top of this same spine.
+1. Scope & how to use this spec
+In scope (Phase 0 + Phase 1): the application shell, responsive layout, theme system,
+navigation, the persistent data layer with schema versioning, and then the financial core
+— setup, accounts, categories, people, income, transactions, transfers, account balances,
+and the internal aggregation logic that every later view will reuse.
+Out of scope for these two phases: recurring payments and the recurrence engine,
+calendar, budgets, paycheck planner, 50/30/20, goals, debt, net worth, investments,
+insights and reminders. These are Phases 2–6 and are specified later. Building them now
+would violate the dependency order.
+How to read this spec. Each Phase 0 and Phase 1 area states what to build, the rules it
+must obey, and its acceptance criteria. Internal engineering terms are used freely in the
+internal sections (schema, logic modules) because those are for the builder. The screen
+sections use only customer-facing language.
+Buyer-language rule (in force for all customer-facing UI). The interface shows plain
+outcomes, never internal mechanics. Approved customer labels include: Safe to spend,
+Planned vs Spent, Upcoming bills, Money coming in, Money going out, Goal progress, Debt
+progress, How your money could grow, What needs attention. Banned from any screen,
+button, label or tooltip: aggregation, canonical/data model, engine, selector, amortization,
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 1 of 13
+
+-- 1 of 13 --
+
+compounding, contribution timing, and similar internal terms. Section 10 is the full
+glossary. Every important interaction follows Open → Understand → Act → See the
+result, and the product must require very little effort or manual upkeep.
+Non-negotiable inheritances from the Blueprint. Transactions are the single source of
+truth; nothing derived is stored; one canonical Category carries both its bucket and its
+needs/wants/savings tag; currency is stored per account even though v1 shows one
+currency; v1 is single-user; mobile-first and PWA-capable.
+2. Phase 0 — Tech stack & application shell
+Recommended stack (a recommendation, flagged for founder sign-off in Section 13):
+React + TypeScript for the UI, because the product is component-heavy and
+TypeScript lets the financial logic be strongly typed — important for money code.
+Tailwind CSS + a headless component base (e.g. shadcn/ui) for styling, so the theme
+tokens in Section 4 drive everything consistently.
+Vite as the build tool; PWA enabled (installable, offline-capable) so the phone
+becomes the capture device.
+Local-first persistence for v1 (see Section 3), since v1 is single-user and the daily-
+capture habit must work instantly and offline. A sync/backend layer is deferred, and
+the data layer is abstracted so it can be added without touching UI or logic.
+This stack is also the native path if the build runs through Lovable (React + TypeScript +
+Tailwind + shadcn), which keeps the option open without committing to it here.
+Application shell responsibilities:
+A single-page app with a persistent layout: a top area for context/title, a main content
+region, and the primary navigation (Section 5).
+The add-a-transaction action is mounted at the shell level as a floating button, present
+on every screen, because fast capture is the core habit.
+Global providers: theme (light/dark), the data layer, and app settings, all available to
+every screen.
+Routing for the Phase 0/1 destinations only (Home, Money, Setup); later destinations
+are added in their phases.
+Loading and empty states are first-class — a brand-new install with no data must still
+look intentional and guide the user to setup, never show a broken empty grid.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 2 of 13
+
+-- 2 of 13 --
+
+Explicitly not in the shell: no exposed formulas, no editable "protected" cells, no
+spreadsheet metaphors. The shell is an app, not a grid.
+3. Phase 0 — Data & persistence layer
+The persistence layer is the foundation everything else writes to. It must be reliable,
+versioned, and swappable.
+Storage choice (v1): a local, structured, transactional store in the browser — IndexedDB,
+accessed through a thin typed wrapper (e.g. Dexie). Rationale: instant reads/writes for
+the capture habit, works offline, no login friction in v1, and it handles the data volumes
+easily (a real user has hundreds to low-thousands of transactions per year, not the
+spreadsheet's pre-provisioned tens of thousands).
+Repository abstraction: all reads and writes go through a repository interface (e.g.
+getAll , get , put , delete , query ) per entity, never direct store calls from UI or logic.
+This is the seam that lets a future cloud/sync backend replace the local store without
+rewriting the app — the deferred multi-user path depends on this abstraction existing
+from day one.
+Schema & versioning:
+Every stored record carries the entity shape defined in Section 6, plus id (stable
+unique), createdAt , updatedAt .
+The database has a schemaVersion. A migration runner applies ordered, tested
+migrations from version N to N+1 on startup. Migrations are additive and non-
+destructive by default; a destructive change requires an explicit, backed-up migration.
+A settings record holds the app's own schemaVersion so the app can detect and
+migrate older data.
+Before any migration that could lose data, the layer exports a full JSON backup the
+user can restore — trust is the product, so data loss is never acceptable.
+Data export/import: a plain JSON export of the whole database (and re-import) ships in
+Phase 0. It is the safety net, the backup mechanism in a local-first app, and later the
+migration path to a synced account.
+Integrity rules enforced at this layer: referential checks (a transaction's
+account/category/person ids must exist), archive-instead-of-delete for dimensions that
+are in use, and rejection of writes that would orphan a linked record. These rules protect
+the single-source-of-truth guarantee.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 3 of 13
+
+-- 3 of 13 --
+
+4. Phase 0 — Theme system & design tokens
+The visual language from the Blueprint becomes a small, named token set that drives
+every screen. Both a dark and a light (cream) theme ship in Phase 0. Hex values below
+are a proposed starting palette to be tightened against the actual reference image
+once provided (Section 13); the token structure is fixed, the exact values are not.
+Typography:
+Financial numbers and headings: an elegant serif (e.g. a refined text serif such as
+Fraunces or Newsreader). Amounts are the hero and should feel considered. Tabular
+figures on for aligned columns.
+UI text and labels: a clean sans-serif (e.g. Inter). Never use the serif for buttons, form
+labels or navigation.
+Spacing & layout: a single spacing scale (4, 8, 12, 16, 24, 32, 48) used everywhere;
+generous whitespace; low default information density with detail on demand. Corner
+radius consistent (e.g. 12px cards, 8px controls).
+Token 	Dark theme 	Light (cream)
+theme
+Use
+surface/base 	#0E0E0F (deep
+black)
+#F6F1E7 (cream) App background
+surface/raised #1A1A1C (warm
+dark)
+#FFFFFF 	Cards, sheets
+text/primary 	#F3EFE6 	#1C1A17 	Main text
+text/muted 	#A8A29A 	#6B655C 	Secondary text
+accent/gold 	#C8A860 (muted
+gold)
+#A9873F 	Primary action, emphasis
+(sparingly)
+positive 	#7FA88A (muted
+sage)
+#4E7A5C 	Money coming in, on-track
+attention 	#C98A5B (muted
+amber)
+#B06E3B 	Needs attention, over-budget
+border/hairline #2A2A2D 	#E4DCCC 	Dividers
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 4 of 13
+
+-- 4 of 13 --
+
+Rules: gold is an accent, never a fill or background; no heavy gradients, neon,
+glassmorphism, or decoration that competes with the numbers. Every token has a dark
+and light value; nothing is hard-coded outside the token set. The accent gold must meet
+contrast requirements against both the deep-black and cream surfaces (Section 12
+checks this). Respect reduced-motion.
+These tokens are the seed of PremierWork's reusable design system; they are defined
+once here and consumed by name, so the product's look stays consistent and can be
+extracted later.
+5. Phase 0 — Navigation shell & Definition of Done
+Navigation (built now, populated over phases). The five primary destinations from the
+Blueprint — Home, Money, Plan, Grow, More — are laid out in Phase 0 as the permanent
+frame. In these two phases only Home, Money and Setup carry real content; Plan and
+Grow render a tasteful "coming soon" placeholder so the frame is complete and the
+information hierarchy is set. On mobile this is a bottom tab bar with the center add
+button; on desktop a left sidebar. Setup is reachable from More and is also the first-run
+wizard.
+Interaction frame. Theme toggle works; navigation is keyboard-accessible on desktop
+and thumb-reachable on mobile; the add button is always present.
+Phase 0 — Definition of Done (all must be true):
+1. The app installs and runs as a PWA on a phone and loads on desktop.
+2. Light and dark themes both render correctly from the token set; toggling works and
+persists.
+3. The five-destination navigation is present and responsive (bottom bar on mobile,
+sidebar on desktop); the add button appears on every screen.
+4. The data layer persists a record, reloads it after a refresh, and survives app restart.
+5. The schema-version migration runner executes and can migrate a v1 database to a v2
+shape in a test.
+6. Full-database JSON export and re-import work round-trip with no data loss.
+7. A fresh install with no data shows intentional empty states and routes the user toward
+Setup, never a broken screen.
+Until every item is true, Phase 1 does not start. Phase 0 ships nothing a user "does" yet —
+it is the platform Phase 1 stands on.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 5 of 13
+
+-- 5 of 13 --
+
+6. Phase 1 — Concrete data schema
+Only the entities Phase 1 needs. Fields marked derived are never stored. All records also
+carry id , createdAt , updatedAt . Money is stored as integer minor units (e.g. paisa) to
+avoid floating-point error — a hard rule for financial correctness.
+Settings (single record): currencyCode (e.g. PKR), currencySymbol (e.g. Rs),
+budgetMethod (zeroBased | carryOver — stored now, used in Phase 3),
+periodStartMonth , periodStartYear (used later; captured at setup), schemaVersion ,
+locale .
+Account: name , type (checking | savings | cash | credit | investment | loan),
+openingBalance (minor units), currencyCode , archived (bool). Balance is derived
+(opening + sum of cleared transactions), never stored.
+Category: name , bucket (bills | expenses | savings | debt | income), needsWantsSavings
+(needs | wants | savings | none — for the later 50/30/20 lens; captured now), color ,
+archived . One canonical record; both tags live here.
+Person: name , archived .
+IncomeSource: name , defaultAmount (minor units, optional), defaultAccount
+(optional), archived . Income entries are transactions with type = income; this record just
+holds reusable defaults for fast entry.
+Transaction (the spine): date , amount (minor units, positive number), direction (out |
+in) OR a signed convention — pick one and keep it consistent (recommend direction for
+clarity in UI), type (expense | income | transfer), categoryId (nullable for transfers),
+accountId , personId (nullable), source (manual | recurring | import — only manual in
+Phase 1), note (optional), cleared (bool, default true), transferGroupId (nullable), and
+the planner links goalId / debtId / investmentId (nullable, unused until Phases 4–5 but
+present in the schema now so no migration is needed later).
+Transfer is not a separate table: a transfer is a pair of transactions with the same
+transferGroupId — one out of the source account, one in to the destination — equal
+in amount, type = transfer, no category. The pair nets to zero across net worth and is
+excluded from spending/income totals.
+Schema rules:
+Dimensions (Account, Category, Person, IncomeSource) are referenced by id ; a
+transaction never stores their names as text.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 6 of 13
+
+-- 6 of 13 --
+
+A dimension in use cannot be deleted — only archived; archived items stay valid on
+historical transactions but drop out of pickers.
+A transaction links to at most one planner entity.
+Deleting one half of a transfer deletes both (they are one logical movement).
+Amounts never negative in storage; direction / type carry the sign meaning.
+7. Phase 1 — Core logic modules (internal)
+These are engineering modules, invisible to the user. They are pure and typed; they read
+the model and return results; they never touch storage or UI directly (they receive data).
+Building them now means every later phase reuses them instead of re-deriving math.
+Balance calculator. Given an account and its cleared transactions, returns current
+balance = openingBalance + Σ(in) − Σ(out). Also returns a total across all accounts.
+Transfers net correctly (out of one, in to another). Pure function, fully unit-tested.
+Aggregation selectors. A single query function over transactions: sum(transactions,
+filters) where filters may include category, categoryType/bucket, account, person,
+type, and a date range ( from / to ). Every total the product will ever show — spending by
+category, money in vs out for a period, per-account, per-person — is a call to this one
+function. Memoized by filter signature and invalidated when transactions change. This is
+the reusable core that replaces thousands of spreadsheet SUMIFS cells.
+Money utility. All money is integer minor units. One module handles arithmetic (never
+floating point on currency), and formatting to the display string using the settings
+currency symbol (e.g. Rs 1,250 ). This is the single place currency is rendered — the
+equivalent of the spreadsheet's repeated concatenation, done once.
+Period utility. Converts a period (a month, or later a pay cycle) into a concrete date range,
+and derives month boundaries. One service, reused wherever a date window is needed,
+so period logic is never re-implemented per screen.
+Validation. Central input validators: valid amount (> 0), valid date, required references
+exist. Feeds inline form validation in the UI (Section 9). Replaces the spreadsheet's in-cell
+"ISSUE FOUND" text with real form validation.
+Derived-state layer. A thin, memoized read layer that assembles what screens need (e.g.
+"this account's balance," "money out this month by category") by calling the balance
+calculator and selectors. Screens read from here; they never compute money math inline.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 7 of 13
+
+-- 7 of 13 --
+
+This enforces the source-of-truth rule: screens are projections, never writers of derived
+values.
+Naming note: none of these module names (selector, aggregation, calculator) ever
+appears in the UI — they are internal only, per the buyer-language rule.
+8. Phase 1 — Screens (customer language)
+Every label below is customer-facing wording. No internal terms appear.
+Setup (first-run wizard). A short, guided sequence, one decision per step, replacing the
+spreadsheet's SETUP tab. Steps: (1) "Pick your currency." (2) "Add your accounts" — name
++ type + starting balance, with an example prompt. (3) "Who spends in your household?"
+— optional people; skippable. (4) "How your money is grouped" — categories, pre-filled
+with sensible defaults the user can edit; they never start from a blank list. (5) "Where your
+money comes from" — optional income sources. A progress indicator, a Back on every
+step, and a Skip on optional steps. Finishing lands the user on Home. Setup is re-editable
+later from More.
+Home (v1). The daily landing screen, showing what these two phases can support: total
+money across accounts, money coming in and money going out for the current month, and
+recent activity. A single clear prompt when something is worth noting (e.g. "Add today's
+spending"). Safe to spend appears here in full once Phase 2 adds upcoming bills; in Phase 1
+it shows the honest current picture (balances + this month's in/out). No charts required in
+v1 beyond a simple in-vs-out summary.
+Money (transactions + accounts). The ledger. A list of transactions newest first, each
+showing amount, what it was for (category), the account, and date; money in and money
+out are visually distinct. Filters by date, category, account, person. Account balances
+shown as a simple list ("Everyday — Rs 42,300"). A running total. Tapping a transaction
+opens it to edit or delete. Transfers between accounts are shown as a single "moved
+money" item, not two confusing entries.
+Quick capture (the core habit). Opened by the always-present add button. One field
+required: the amount, on a large keypad. Category, account, person and date are pre-filled
+with the most likely values and editable with one tap; nothing else is required. A
+prominent Save. Optional note behind a "more" affordance (progressive disclosure). On
+save: instant confirmation and the new figure reflected immediately. The whole flow is
+designed to finish in a few seconds.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 8 of 13
+
+-- 8 of 13 --
+
+Accounts, Categories & People management. Simple management screens (reachable
+from Money and More): add/edit/archive an account, category, or person. Archive, never
+hard-delete, anything in use — with a plain message ("This is used by past transactions, so
+it's archived instead of deleted"). Categories show their group; the needs/wants label is
+captured quietly for later and not emphasized now.
+Across all screens: empty states are warm and directive ("No transactions yet — add your
+first one"), feedback is immediate, and there is always one obvious next action.
+9. Phase 1 — Key interactions (Open → Understand → Act → See the
+result)
+Every important interaction follows the same four-beat rhythm. Three worked examples
+for Phase 1:
+Capture an expense.
+Open: tap the add button (present on every screen).
+Understand: a large amount keypad with the most-likely category and account already
+filled in.
+Act: type the amount, adjust category if needed, Save.
+See the result: instant confirmation; the account balance and this month's "money
+going out" update immediately on Home and Money.
+Check where I stand today.
+Open: launch the app; it lands on Home.
+Understand: total money, money in and money out this month, and recent activity, in
+plain figures.
+Act: if something needs doing, one prompt says what (e.g. "Add today's spending").
+See the result: acting on the prompt updates the picture without leaving Home.
+Fix a mistake.
+Open: find the transaction in Money (search/filter if needed).
+Understand: the transaction opens showing its details.
+Act: edit a field or delete it.
+See the result: every total that included it corrects itself instantly — because totals are
+always computed from transactions, there is nothing else to update.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 9 of 13
+
+-- 9 of 13 --
+
+Interaction rules for the whole phase: the primary action on any screen is reachable
+without hunting; forms validate inline and never lose entered data; destructive actions
+confirm once; the app never asks for information it can default; and no action ever
+requires the user to "maintain" a total, expand rows, or avoid breaking anything — the
+spreadsheet's maintenance burden is designed out.
+10. Buyer-language glossary
+The binding translation between internal concepts and what the customer sees. The left
+column may appear in code and in this spec; it must never appear in the UI. The right
+column is the only wording users see.
+Internal concept 	Customer-facing label
+Aggregation / selector total 	(shown as the outcome, e.g. "Money going
+out")
+Canonical data model / source of truth 	(never shown)
+Domain engine / calculation engine 	(never shown)
+Transaction (expense) 	An expense / "money going out"
+Transaction (income) 	Income / "money coming in"
+Transfer 	Moved money
+Account balance 	Balance (e.g. "Everyday — Rs 42,300")
+Recurrence / occurrence (Phase 2) 	Upcoming bills, repeating payments
+Safe-to-spend calculation 	Safe to spend
+Budget vs actual (Phase 3) 	Planned vs Spent
+Category bucket / needs-wants-savings 	Groups (spending groups); the 50/30/20 view
+later
+Carry-over / zero-based logic 	"Roll leftover into next month" / "Give every
+rupee a job"
+Amortization schedule (Phase 4) 	Debt progress / payoff plan
+Compounding / contribution timing
+(Phase 5)
+How your money could grow
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 10 of 13
+
+-- 10 of 13 --
+
+Rule for builders: if a screen needs a word for something and the only word that comes to
+mind is on the left, stop and use the right column or invent a plain-language equivalent.
+When in doubt, describe the outcome, not the mechanism.
+11. Acceptance criteria
+Objective and testable. Phase 0's criteria are in Section 5; Phase 1's are below. Phase 1 is
+done only when all are true.
+1. A new user completes the setup wizard (currency, at least one account, default
+categories) and lands on Home.
+2. The user can add an expense in a few taps with only the amount required; category and
+account are pre-filled and editable.
+3. Adding, editing, or deleting a transaction updates the affected account balance and
+this month's money-in / money-out figures immediately and correctly.
+4. Account balance equals opening balance plus cleared income minus cleared expenses,
+verified against a hand-computed fixture.
+5. A transfer between two accounts moves the balance correctly, appears as one "moved
+money" item, and is excluded from spending and income totals.
+6. Money is stored in minor units; no rounding or floating-point error appears in any
+displayed total (verified with adversarial amounts).
+7. Filtering the transaction list by date, category, account, and person returns correct
+subsets and correct filtered totals.
+8. A category/account/person that is used by a transaction cannot be hard-deleted;
+archiving it keeps historical transactions intact and removes it from pickers.
+9. All data survives a full app restart; export then re-import reproduces the exact state.
+10. No customer-facing screen, label, button or tooltip contains a banned internal term
+(Section 10 glossary), verified by review and an automated string check.
+11. Every Phase 1 screen is usable on a phone (single column, thumb-reachable add, no
+horizontal scroll) and on desktop.
+12. Both themes render every Phase 1 screen correctly.
+Internal concept 	Customer-facing label
+Attention state 	What needs attention
+Person / spender 	Who spent it (household member)
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 11 of 13
+
+-- 11 of 13 --
+
+When all twelve hold, the product is a clean, trustworthy money tracker — a shippable v1
+candidate on its own — and Phase 2 (recurring & cash flow) may begin.
+12. Test plan
+Weighted toward correctness of money math, per the Blueprint's testing philosophy.
+Logic unit tests (highest priority). The balance calculator, aggregation selectors,
+money utility (arithmetic + formatting), and period utility get exhaustive tests with
+hand-computed fixtures, including adversarial amounts (large values, many decimals,
+zero, mixed in/out) to prove no floating-point error.
+Source-of-truth invariants (property tests). No derived value is ever persisted;
+editing/deleting a transaction updates every dependent total; a transfer nets to zero
+across accounts; archived dimensions never break historical transactions.
+Data-layer tests. Persistence round-trips; export/import reproduces exact state; the
+migration runner upgrades a v1 database to v2 without data loss.
+Component/interaction tests. Quick capture saves with only an amount and correct
+defaults; inline validation blocks a bad amount/date without losing entry; archive-not-
+delete behavior; empty states render.
+Buyer-language check (automated). A string scan of the built UI fails CI if any banned
+internal term (Section 10) appears in visible text.
+Responsive & accessibility checks. No horizontal scroll on mobile; touch targets ≥
+44px; the gold accent passes contrast against both deep-black and cream surfaces;
+keyboard navigation works on desktop; reduced-motion respected.
+End-to-end smoke (Phase 1 done). Setup → add income → add expense → add transfer
+→ verify Home and balances → edit one → verify totals correct → restart app → data
+intact.
+Golden-number discipline: the balance and aggregation fixtures are locked; any change
+that alters a known-correct total fails CI, so a refactor can never silently change a user's
+money figures. This same harness carries forward to lock the four verified financial
+formulas when their engines are built in Phases 2–5.
+13. Out of scope now + founder inputs needed
+Explicitly out of scope for Phase 0 + Phase 1 (built in later phases, do not start early):
+recurring payments and the recurrence engine, calendar, monthly/paycheck budgets,
+50/30/20, goals, debt, net worth, investments, insights, reminders/notifications, multi-user
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 12 of 13
+
+-- 12 of 13 --
+
+accounts and sync, and multi-currency UI. The schema already reserves the fields these
+need (planner links, budget method, period, per-account currency) so none requires a
+later migration.
+Founder inputs needed — nice to confirm before build, but not blocking (sensible
+defaults are stated):
+1. Tech stack sign-off (Section 2). Default: React + TypeScript + Tailwind + PWA, local-
+first storage. Confirm, or name a constraint (e.g. must build via Lovable, must use a
+specific backend).
+2. The visual reference image. Default: the proposed palette in Section 4. If you share
+the actual reference, the hex values and font pairing get tightened to it; the token
+structure won't change.
+3. Default category list. Default: I'll propose a starter set (bills, groceries, transport,
+eating out, subscriptions, savings, etc.) at build time. Confirm if you have a preferred
+starting taxonomy.
+4. Currency display format. Default: Rs 1,250 (symbol + thousands separators, no
+decimals shown for whole amounts). Confirm symbol placement and decimal handling.
+5. App name shown in the UI. Default: "All-in-One Personal Finance by PremierWork."
+Confirm the product name/branding to display.
+Blocking nothing: none of the above stops Phase 0 from starting; they can be confirmed
+in parallel and applied as Phase 1 screens are built. The one thing that must be true before
+Phase 1 UI work is that Phase 0's Definition of Done (Section 5) is met.
+Ready state: with the architecture locked and the four financial rules verified, this spec is
+complete for Phases 0–1. On your go-ahead, the next step is implementation of Phase 0,
+then Phase 1, against the acceptance criteria above.
+ALL-IN-ONE PERSONAL FINANCE — Phase 0 + Phase 1 Build Specification
+Page 13 of 13
+
+-- 13 of 13 --
+

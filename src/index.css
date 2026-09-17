@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens (Section 4). Values are RGB triplets so Tailwind's
+ * <alpha-value> mechanism works. The token STRUCTURE is fixed; the exact
+ * hex values are the proposed starting palette from the spec and can be
+ * tightened later without touching any component.
+ */
+@layer base {
+  :root,
+  [data-theme="midnight"] {
+    --surface-base: 14 14 15; /* #0E0E0F deep black */
+    --surface-raised: 26 26 28; /* #1A1A1C warm dark */
+    --surface-inset: 20 20 22;
+    --text-primary: 243 239 230; /* #F3EFE6 */
+    --text-muted: 168 162 154; /* #A8A29A */
+    --accent-gold: 200 168 96; /* #C8A860 muted gold */
+    --positive: 127 168 138; /* #7FA88A muted sage */
+    --attention: 201 138 91; /* #C98A5B muted amber */
+    --border-hairline: 42 42 45; /* #2A2A2D */
+    color-scheme: dark;
+  }
+
+  [data-theme="soft"] {
+    --surface-base: 246 241 231; /* #F6F1E7 cream */
+    --surface-raised: 255 255 255; /* #FFFFFF */
+    --surface-inset: 239 232 218;
+    --text-primary: 28 26 23; /* #1C1A17 */
+    --text-muted: 107 101 92; /* #6B655C */
+    --accent-gold: 169 135 63; /* #A9873F */
+    --positive: 78 122 92; /* #4E7A5C */
+    --attention: 176 110 59; /* #B06E3B */
+    --border-hairline: 228 220 204; /* #E4DCCC */
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-base text-ink font-sans antialiased;
+    font-feature-settings: "cv01" 1;
+  }
+
+  /* Financial numbers and headings use the serif; amounts are the hero. */
+  .font-amount {
+    @apply font-serif;
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Respect reduced motion (Section 4). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent-gold));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-raised border border-hairline rounded-card;
+  }
+  .hairline {
+    @apply border-hairline;
+  }
+}
