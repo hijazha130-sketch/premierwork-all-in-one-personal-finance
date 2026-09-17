@@ -35,5 +35,10 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: [],
+    // Only this project's own tests. The `premierwork-all-in-one-personal-finance/`
+    // entry excludes an accidental nested copy of the repo so its stale test
+    // files are never collected.
+    include: ["tests/**/*.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "premierwork-all-in-one-personal-finance/**"],
   },
 });

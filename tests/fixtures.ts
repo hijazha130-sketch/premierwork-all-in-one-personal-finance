@@ -33,6 +33,8 @@ export function makeTx(partial: Partial<Transaction> & { accountId: string }): T
     note: partial.note,
     cleared: partial.cleared ?? true,
     transferGroupId: partial.transferGroupId ?? null,
+    recurringRuleId: partial.recurringRuleId ?? null,
+    occurrenceDate: partial.occurrenceDate ?? null,
     goalId: null,
     debtId: null,
     investmentId: null,

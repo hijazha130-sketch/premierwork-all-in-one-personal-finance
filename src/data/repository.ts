@@ -73,8 +73,9 @@ export class FinanceRepository {
       periodStartMonth: new Date().getMonth() + 1,
       periodStartYear: new Date().getFullYear(),
       locale: "en-PK",
-      schemaVersion: 2,
+      schemaVersion: 3,
       setupComplete: false,
+      safeToSpendHorizon: "endOfMonth",
       ...patch,
     });
     await this.db.settings.put(created);
@@ -202,11 +203,21 @@ export class FinanceRepository {
 
   /** Create a single expense/income transaction. */
   async createTransaction(
-    data: Omit<Transaction, keyof BaseRecord | "transferGroupId" | "goalId" | "debtId" | "investmentId"> &
-      Partial<Pick<Transaction, "transferGroupId" | "goalId" | "debtId" | "investmentId">>,
+    data: Omit<
+      Transaction,
+      keyof BaseRecord | "transferGroupId" | "goalId" | "debtId" | "investmentId" | "recurringRuleId" | "occurrenceDate"
+    > &
+      Partial<
+        Pick<
+          Transaction,
+          "transferGroupId" | "goalId" | "debtId" | "investmentId" | "recurringRuleId" | "occurrenceDate"
+        >
+      >,
   ): Promise<Transaction> {
     const rec = stampNew<Transaction>({
       transferGroupId: null,
+      recurringRuleId: null,
+      occurrenceDate: null,
       goalId: null,
       debtId: null,
       investmentId: null,
@@ -268,6 +279,8 @@ export class FinanceRepository {
       note: input.note,
       cleared,
       transferGroupId: groupId,
+      recurringRuleId: null,
+      occurrenceDate: null,
       goalId: null,
       debtId: null,
       investmentId: null,

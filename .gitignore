@@ -33,6 +33,10 @@ extract2.js
 spec.txt
 spec2.txt
 
+# Accidental nested copy of the repository (created during an earlier folder move).
+# Not part of the product; excluded from git and tooling. Safe to remove.
+/premierwork-all-in-one-personal-finance/
+
 # Env
 .env
 .env.*

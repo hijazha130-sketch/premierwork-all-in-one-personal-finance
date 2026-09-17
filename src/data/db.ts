@@ -16,12 +16,14 @@ import type {
   Category,
   IncomeSource,
   Person,
+  RecurringOverride,
+  RecurringRule,
   Settings,
   Transaction,
 } from "@/domain/types";
 
 /** The current app/data schema version. Bump when adding a migration. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export class FinanceDB extends Dexie {
   settings!: Table<Settings, string>;
@@ -30,6 +32,9 @@ export class FinanceDB extends Dexie {
   people!: Table<Person, string>;
   incomeSources!: Table<IncomeSource, string>;
   transactions!: Table<Transaction, string>;
+  // Phase 2 (additive): recurring rules + their per-occurrence exceptions.
+  recurringRules!: Table<RecurringRule, string>;
+  recurringOverrides!: Table<RecurringOverride, string>;
 
   constructor(name = "premierwork-finance", options?: DBOptions) {
     super(name, options as ConstructorParameters<typeof Dexie>[1]);
@@ -71,6 +76,36 @@ export class FinanceDB extends Dexie {
           .toCollection()
           .modify((s: Partial<Settings>) => {
             s.schemaVersion = 2;
+          });
+      });
+
+    // --- Migration 2 → 3 (Phase 2) ------------------------------------------
+    // Additive, non-destructive: add the recurring-rules + overrides tables,
+    // extend the transactions index with recurringRuleId, and backfill the two
+    // new nullable transaction fields plus the Safe-to-Spend horizon setting.
+    // Only changed/new stores are listed; unchanged tables carry forward.
+    this.version(3)
+      .stores({
+        transactions:
+          "id, date, accountId, categoryId, personId, type, direction, transferGroupId, cleared, recurringRuleId",
+        recurringRules:
+          "id, name, accountId, categoryId, personId, frequency, active, archived",
+        recurringOverrides: "id, ruleId, occurrenceDate, [ruleId+occurrenceDate]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("transactions")
+          .toCollection()
+          .modify((t: Partial<Transaction>) => {
+            if (t.recurringRuleId === undefined) t.recurringRuleId = null;
+            if (t.occurrenceDate === undefined) t.occurrenceDate = null;
+          });
+        await tx
+          .table("settings")
+          .toCollection()
+          .modify((s: Partial<Settings>) => {
+            if (s.safeToSpendHorizon == null) s.safeToSpendHorizon = "endOfMonth";
+            s.schemaVersion = 3;
           });
       });
   }
