@@ -7,11 +7,12 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { EmptyState } from "@/components/EmptyState";
 import { TransactionRow } from "@/components/RecentActivity";
 import { RepeatingRules } from "@/screens/RepeatingRules";
+import { Calendar } from "@/screens/Calendar";
 import { buildLedgerRows } from "@/domain/ledger";
 import { filterTransactions, sumTransactions } from "@/domain/aggregation";
 import type { DateRange } from "@/lib/period";
 
-type MoneyView = "activity" | "repeating";
+type MoneyView = "activity" | "repeating" | "calendar";
 
 /**
  * Money (Section 8). The ledger: transactions newest first with money in/out
@@ -90,7 +91,9 @@ export function Money() {
         subtitle={
           view === "activity"
             ? "Everything in and out — and what's in each account."
-            : "Bills and income that repeat — set once, tracked automatically."
+            : view === "repeating"
+              ? "Bills and income that repeat — set once, tracked automatically."
+              : "What's due and when — planned bills and money you've recorded."
         }
       />
 
@@ -101,11 +104,14 @@ export function Money() {
         options={[
           { value: "activity", label: "Activity" },
           { value: "repeating", label: "Repeating" },
+          { value: "calendar", label: "Calendar" },
         ]}
       />
 
       {view === "repeating" ? (
         <RepeatingRules />
+      ) : view === "calendar" ? (
+        <Calendar />
       ) : (
         <>
       {/* Account balances */}

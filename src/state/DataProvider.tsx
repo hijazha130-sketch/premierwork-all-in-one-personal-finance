@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDB } from "@/data/db";
 import { FinanceRepository } from "@/data/repository";
@@ -39,6 +39,12 @@ interface DataContextValue {
   accountsById: Map<string, Account>;
   peopleById: Map<string, Person>;
   recurringRulesById: Map<string, RecurringRule>;
+  /**
+   * Statused occurrences for an arbitrary range (e.g. a navigated calendar
+   * month that may fall outside the default window). Runs the engine with the
+   * current data so screens never call the engine themselves (invariant #9).
+   */
+  occurrencesForRange: (range: DateRange) => Occurrence[];
   derived: {
     total: number;
     balances: Record<string, number>;
@@ -67,6 +73,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const transactions = useLiveQuery(() => repo.listTransactions(), []);
   const recurringRules = useLiveQuery(() => repo.listRecurringRules(), []);
   const recurringOverrides = useLiveQuery(() => repo.listRecurringOverrides(), []);
+
+  // Occurrences for any requested range — used by the Calendar's month paging.
+  const occurrencesForRange = useCallback(
+    (range: DateRange): Occurrence[] =>
+      computeOccurrences(recurringRules ?? [], transactions ?? [], recurringOverrides ?? [], range, todayIso()),
+    [recurringRules, transactions, recurringOverrides],
+  );
 
   // Any undefined live query means the first read hasn't resolved yet.
   const loading =
@@ -120,6 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       accountsById: new Map(acc.map((a) => [a.id, a])),
       peopleById: new Map(ppl.map((p) => [p.id, p])),
       recurringRulesById: new Map(rules.map((r) => [r.id, r])),
+      occurrencesForRange,
       derived: {
         total: totalBalance(acc, txns),
         balances: balancesByAccount(acc, txns),
@@ -132,7 +146,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         projectedCashflow: projectCashflow(acc, txns, occurrences, range, today),
       },
     };
-  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides]);
+  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

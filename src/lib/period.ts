@@ -61,3 +61,20 @@ export function formatDateLabel(date: IsoDate, locale = "en-US"): string {
     year: "numeric",
   });
 }
+
+/**
+ * Month grid layout for a calendar (pure presentation, not money math). Returns
+ * whole weeks (Monday-first) of ISO dates, with leading/trailing `null` cells so
+ * the grid always has complete 7-day rows. Weekday header labels are Mon..Sun.
+ */
+export function monthGrid({ year, month }: MonthKey): (IsoDate | null)[][] {
+  const firstWeekday = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7; // Mon=0..Sun=6
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const cells: (IsoDate | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(`${year}-${pad(month)}-${pad(d)}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (IsoDate | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}

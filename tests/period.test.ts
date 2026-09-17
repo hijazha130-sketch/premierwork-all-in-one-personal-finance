@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthRange, inRange, currentMonth, todayIso, formatDateLabel } from "@/lib/period";
+import { monthRange, inRange, currentMonth, todayIso, formatDateLabel, monthGrid } from "@/lib/period";
 
 describe("period utility", () => {
   it("computes an inclusive month range including leap/short months", () => {
@@ -24,5 +24,23 @@ describe("period utility", () => {
 
   it("formats a friendly date label", () => {
     expect(formatDateLabel("2026-09-17", "en-US")).toMatch(/Sep/);
+  });
+
+  it("lays out a Monday-first month grid with leading/trailing blanks", () => {
+    // Jan 2024 starts on a Monday — no leading blanks.
+    const jan = monthGrid({ year: 2024, month: 1 });
+    expect(jan.every((w) => w.length === 7)).toBe(true);
+    expect(jan[0][0]).toBe("2024-01-01");
+    const janDays = jan.flat().filter(Boolean);
+    expect(janDays).toHaveLength(31);
+    expect(janDays[janDays.length - 1]).toBe("2024-01-31");
+
+    // Feb 2024 starts on a Thursday (Monday-index 3) — three leading blanks.
+    const feb = monthGrid({ year: 2024, month: 2 });
+    expect(feb[0][0]).toBeNull();
+    expect(feb[0][1]).toBeNull();
+    expect(feb[0][2]).toBeNull();
+    expect(feb[0][3]).toBe("2024-02-01");
+    expect(feb.flat().filter(Boolean)).toHaveLength(29); // leap year
   });
 });
