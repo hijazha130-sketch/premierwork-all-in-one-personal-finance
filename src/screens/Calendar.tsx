@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useData, useCurrency } from "@/state/DataProvider";
 import { Card, Pill } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
+import { OccurrenceActions } from "@/components/OccurrenceActions";
 import { buildDayItems, weekOutTotal, type DayItems } from "@/domain/calendar";
 import { monthGrid, monthRange, monthLabel, currentMonth, formatDateLabel, todayIso } from "@/lib/period";
 import { formatMoney } from "@/lib/money";
@@ -152,13 +153,14 @@ export function Calendar() {
               {selectedItems.planned.map((o, i) => {
                 const name = recurringRulesById.get(o.ruleId)?.name ?? (o.direction === "in" ? "Income" : "Bill");
                 return (
-                  <div key={`p${i}`} className="flex items-center gap-3 rounded-control border border-hairline px-3 py-2">
+                  <div key={`p${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-hairline px-3 py-2">
                     <span className="flex-1 min-w-0">
                       <span className="block truncate text-ink">{name}</span>
                       <span className="block text-xs text-muted">{STATUS_TEXT[o.status]}</span>
                     </span>
                     <StatusPill status={o.status} />
                     <MoneyAmount amount={o.amount} size="sm" tone={o.direction === "in" ? "positive" : "default"} />
+                    <OccurrenceActions occurrence={o} />
                   </div>
                 );
               })}

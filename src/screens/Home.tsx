@@ -5,6 +5,7 @@ import { Button, Card } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { EmptyState } from "@/components/EmptyState";
 import { RecentActivity } from "@/components/RecentActivity";
+import { OccurrenceActions } from "@/components/OccurrenceActions";
 import { monthLabel, currentMonth } from "@/lib/period";
 import type { Occurrence } from "@/domain/occurrences";
 
@@ -99,12 +100,13 @@ export function Home() {
           </p>
           <div className="divide-y divide-hairline">
             {overdue.map((o, i) => (
-              <div key={i} className="flex items-center gap-4 py-3">
+              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-ink font-medium">{nameOf(o)}</span>
                   <span className="block text-xs text-attention">was due {shortDate(o.displayDate, locale)}</span>
                 </span>
                 <MoneyAmount amount={o.amount} size="sm" tone={o.direction === "in" ? "positive" : "attention"} />
+                <OccurrenceActions occurrence={o} />
               </div>
             ))}
           </div>
@@ -138,12 +140,13 @@ export function Home() {
           </div>
           <div className="divide-y divide-hairline">
             {upcoming.map((o, i) => (
-              <div key={i} className="flex items-center gap-4 py-3">
+              <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-ink font-medium">{nameOf(o)}</span>
                   <span className="block text-xs text-muted">Coming up · {shortDate(o.displayDate, locale)}</span>
                 </span>
                 <MoneyAmount amount={o.amount} size="sm" tone={o.direction === "in" ? "positive" : "default"} />
+                <OccurrenceActions occurrence={o} />
               </div>
             ))}
           </div>

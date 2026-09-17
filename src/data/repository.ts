@@ -448,20 +448,33 @@ export class FinanceRepository {
   async createTransactionFromOccurrence(
     rule: RecurringRule,
     occurrenceDate: IsoDate,
-    opts?: { cleared?: boolean; note?: string; override?: RecurringOverride },
+    opts?: {
+      cleared?: boolean;
+      note?: string;
+      override?: RecurringOverride;
+      // User-confirmed tweaks (from the "Mark as paid" sheet). When omitted, the
+      // value falls back to the adjust override, then the rule's own value.
+      amount?: Minor;
+      date?: IsoDate;
+      categoryId?: string | null;
+      accountId?: string;
+      personId?: string | null;
+    },
   ): Promise<Transaction> {
     const override = opts?.override ?? (await this.getOverride(rule.id, occurrenceDate));
     const adjusting = override?.action === "adjust";
-    const amount = adjusting && override?.adjustedAmount != null ? override.adjustedAmount : rule.amount;
-    const date = adjusting && override?.adjustedDate != null ? override.adjustedDate : occurrenceDate;
+    const amount =
+      opts?.amount ?? (adjusting && override?.adjustedAmount != null ? override.adjustedAmount : rule.amount);
+    const date =
+      opts?.date ?? (adjusting && override?.adjustedDate != null ? override.adjustedDate : occurrenceDate);
     return this.createTransaction({
       date,
       amount,
       direction: rule.direction,
       type: rule.type,
-      categoryId: rule.categoryId,
-      accountId: rule.accountId,
-      personId: rule.personId,
+      categoryId: opts?.categoryId !== undefined ? opts.categoryId : rule.categoryId,
+      accountId: opts?.accountId ?? rule.accountId,
+      personId: opts?.personId !== undefined ? opts.personId : rule.personId,
       source: "recurring",
       note: opts?.note,
       cleared: opts?.cleared ?? true,

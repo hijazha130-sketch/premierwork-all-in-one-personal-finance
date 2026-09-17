@@ -14,7 +14,7 @@ import type { TransactionType } from "@/domain/types";
  * an existing transaction (edit or delete).
  */
 export function QuickCapture() {
-  const { open, mode, editingId, close } = useCapture();
+  const { open, mode, editingId, confirm, close } = useCapture();
   const { repo, accounts, categories, people, transactions } = useData();
 
   const editing = useMemo(
@@ -37,10 +37,20 @@ export function QuickCapture() {
   const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  // Initialise the form whenever the sheet opens (new capture or edit).
+  // Initialise the form whenever the sheet opens (confirm a bill, edit, or new).
   useEffect(() => {
     if (!open) return;
-    if (editing) {
+    if (confirm) {
+      const { rule, occurrence } = confirm;
+      setType(rule.type);
+      setAmountText(String(minorToMajor(occurrence.amount)));
+      setCategoryId(rule.categoryId ?? "");
+      setAccountId(rule.accountId);
+      setPersonId(rule.personId ?? "");
+      setDate(occurrence.displayDate);
+      setNote("");
+      setShowNote(false);
+    } else if (editing) {
       setType(editing.type);
       setAmountText(String(minorToMajor(editing.amount)));
       setCategoryId(editing.categoryId ?? "");
@@ -62,7 +72,7 @@ export function QuickCapture() {
     }
     setError("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingId, mode]);
+  }, [open, editingId, mode, confirm]);
 
   const isTransfer = type === "transfer";
 
@@ -75,7 +85,20 @@ export function QuickCapture() {
 
     setSaving(true);
     try {
-      if (editing) {
+      if (confirm) {
+        // Mark as paid: confirm the planned item into a real transaction through
+        // the single existing path. occurrenceDate stays the SCHEDULED date (the
+        // canonical key) even if the user edited the actual date.
+        await repo.createTransactionFromOccurrence(confirm.rule, confirm.occurrence.date, {
+          amount: amount!,
+          date,
+          categoryId: categoryId || null,
+          accountId,
+          personId: personId || null,
+          note: note.trim() || undefined,
+          cleared: true,
+        });
+      } else if (editing) {
         await repo.updateTransaction(editing.id, {
           amount: amount!,
           categoryId: editing.type === "transfer" ? null : categoryId || null,
@@ -126,15 +149,19 @@ export function QuickCapture() {
     }
   }
 
-  const title = editing
-    ? editing.type === "transfer"
-      ? "Edit moved money"
-      : "Edit"
-    : isTransfer
-      ? "Move money"
-      : type === "income"
-        ? "Add money coming in"
-        : "Add a spend";
+  const title = confirm
+    ? confirm.rule.type === "income"
+      ? "Confirm money in"
+      : "Confirm this bill"
+    : editing
+      ? editing.type === "transfer"
+        ? "Edit moved money"
+        : "Edit"
+      : isTransfer
+        ? "Move money"
+        : type === "income"
+          ? "Add money coming in"
+          : "Add a spend";
 
   const activeCategories = type === "income" ? incomeCategories : expenseCategories;
 
@@ -144,7 +171,7 @@ export function QuickCapture() {
         <p className="text-muted">Add an account first, then you can record money here.</p>
       ) : (
         <div className="space-y-5">
-          {!editing && (
+          {!editing && !confirm && (
             <Segmented
               ariaLabel="Type"
               value={type}
@@ -255,7 +282,7 @@ export function QuickCapture() {
 
           <div className="flex items-center gap-3 pt-2">
             <Button className="flex-1" onClick={handleSave} disabled={saving}>
-              {editing ? "Save changes" : "Save"}
+              {confirm ? "Mark as paid" : editing ? "Save changes" : "Save"}
             </Button>
             {editing && (
               <Button variant="danger" onClick={handleDelete} disabled={saving}>
