@@ -2,13 +2,16 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "@/state/DataProvider";
 import { useCapture } from "@/state/CaptureProvider";
-import { Button, Card, SectionTitle, SelectInput, TextInput } from "@/components/ui";
+import { Button, Card, SectionTitle, Segmented, SelectInput, TextInput } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { EmptyState } from "@/components/EmptyState";
 import { TransactionRow } from "@/components/RecentActivity";
+import { RepeatingRules } from "@/screens/RepeatingRules";
 import { buildLedgerRows } from "@/domain/ledger";
 import { filterTransactions, sumTransactions } from "@/domain/aggregation";
 import type { DateRange } from "@/lib/period";
+
+type MoneyView = "activity" | "repeating";
 
 /**
  * Money (Section 8). The ledger: transactions newest first with money in/out
@@ -19,6 +22,7 @@ export function Money() {
   const { accounts, categories, people, transactions, derived } = useData();
   const { openCapture } = useCapture();
 
+  const [view, setView] = useState<MoneyView>("activity");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [personId, setPersonId] = useState("");
@@ -80,8 +84,30 @@ export function Money() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <SectionTitle overline="Money" title="Your ledger" subtitle="Everything in and out — and what's in each account." />
+      <SectionTitle
+        overline="Money"
+        title="Your money"
+        subtitle={
+          view === "activity"
+            ? "Everything in and out — and what's in each account."
+            : "Bills and income that repeat — set once, tracked automatically."
+        }
+      />
 
+      <Segmented
+        ariaLabel="View"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: "activity", label: "Activity" },
+          { value: "repeating", label: "Repeating" },
+        ]}
+      />
+
+      {view === "repeating" ? (
+        <RepeatingRules />
+      ) : (
+        <>
       {/* Account balances */}
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -179,6 +205,8 @@ export function Money() {
           </div>
         )}
       </Card>
+        </>
+      )}
     </div>
   );
 }

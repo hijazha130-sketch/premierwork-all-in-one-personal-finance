@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeOccurrences, upcoming, overdue } from "@/domain/occurrences";
+import { computeOccurrences, upcoming, overdue, nextUnpaidByRule } from "@/domain/occurrences";
 import type { RecurringFrequency, RecurringOverride, RecurringRule, Transaction } from "@/domain/types";
 import type { DateRange } from "@/lib/period";
 import { makeTx } from "./fixtures";
@@ -150,5 +150,19 @@ describe("occurrence status engine — selectors", () => {
     expect(od.every((o) => o.status === "overdue")).toBe(true);
     expect(od.map((o) => o.date)).toContain("2026-06-10");
     expect(od.map((o) => o.date)).toContain("2026-01-10");
+  });
+
+  it("nextUnpaidByRule picks the earliest unpaid occurrence per rule", () => {
+    const rule1 = makeRule({ id: "rule1", anchorDate: "2026-01-10" });
+    const rule2 = makeRule({ id: "rule2", anchorDate: "2026-03-05" });
+    const occ = computeOccurrences([rule1, rule2], [], [], YEAR, TODAY);
+
+    const next = nextUnpaidByRule(occ);
+    expect(next.get("rule1")?.date).toBe("2026-01-10"); // earliest unpaid (overdue) for rule1
+    expect(next.get("rule2")?.date).toBe("2026-03-05");
+
+    // Paying the earliest unpaid moves the pointer to the next one.
+    const withPaid = computeOccurrences([rule1, rule2], [recTx("rule1", "2026-01-10")], [], YEAR, TODAY);
+    expect(nextUnpaidByRule(withPaid).get("rule1")?.date).toBe("2026-02-10");
   });
 });

@@ -147,6 +147,20 @@ export function overdue(occurrences: Occurrence[]): Occurrence[] {
   return occurrences.filter((o) => o.status === "overdue");
 }
 
+/**
+ * The earliest still-unpaid occurrence for each rule, keyed by ruleId. Used to
+ * show a repeating item's next date without recomputing anything in the UI.
+ */
+export function nextUnpaidByRule(occurrences: Occurrence[]): Map<string, Occurrence> {
+  const map = new Map<string, Occurrence>();
+  for (const o of occurrences) {
+    if (o.status !== "upcoming" && o.status !== "overdue") continue;
+    const current = map.get(o.ruleId);
+    if (!current || o.date < current.date) map.set(o.ruleId, o);
+  }
+  return map;
+}
+
 function key(ruleId: string, date: IsoDate): string {
   return `${ruleId}|${date}`;
 }

@@ -17,6 +17,12 @@ const BANNED = [
   "domain engine",
   "calculation engine",
   "schemaVersion", // never surfaced to users
+  // Phase 2 internal terms — the UI says "repeating", "bill", "coming up" instead.
+  "recurrence",
+  "occurrence",
+  "projection",
+  "engine",
+  "rule",
 ];
 
 // Allowlist: files/paths that are internal-only tooling, if any.
