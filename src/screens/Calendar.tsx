@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useData, useCurrency } from "@/state/DataProvider";
+import { useData, useCurrency } from "@/state/dataContext";
 import { Card, Pill } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { OccurrenceActions } from "@/components/OccurrenceActions";

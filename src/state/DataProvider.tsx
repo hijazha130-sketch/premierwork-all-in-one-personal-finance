@@ -1,66 +1,20 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDB } from "@/data/db";
 import { FinanceRepository } from "@/data/repository";
-import type {
-  Account,
-  Category,
-  IncomeSource,
-  Person,
-  RecurringOverride,
-  RecurringRule,
-  Settings,
-  Transaction,
-} from "@/domain/types";
 import { balancesByAccount, totalBalance } from "@/domain/balance";
 import { moneyIn, moneyOut } from "@/domain/aggregation";
 import { currentMonth, monthRange, todayIso, type DateRange } from "@/lib/period";
 import { computeOccurrences, overdue, upcoming, type Occurrence } from "@/domain/occurrences";
-import { projectCashflow, safeToSpend, type CashflowProjection, type SafeToSpendResult } from "@/domain/cashflow";
+import { projectCashflow, safeToSpend } from "@/domain/cashflow";
+import { DataContext, type DataContextValue } from "@/state/dataContext";
 
 /**
- * The data layer made available to every screen. This is the app-level derived
- * state seam: screens read balances/totals from here and never compute money
- * math inline (Section 7, "Derived-state layer").
+ * The app-level derived-state seam. Screens read balances, totals, Safe to Spend,
+ * upcoming/overdue etc. from here and never compute money math inline. The
+ * context object and hooks live in dataContext.ts so this file exports only a
+ * component (Fast Refresh friendly).
  */
-interface DataContextValue {
-  repo: FinanceRepository;
-  loading: boolean;
-  settings: Settings | undefined;
-  accounts: Account[];
-  categories: Category[];
-  people: Person[];
-  incomeSources: IncomeSource[];
-  transactions: Transaction[];
-  // Phase 2: recurring rules + overrides, alongside the other dimensions.
-  recurringRules: RecurringRule[];
-  recurringOverrides: RecurringOverride[];
-  categoriesById: Map<string, Category>;
-  accountsById: Map<string, Account>;
-  peopleById: Map<string, Person>;
-  recurringRulesById: Map<string, RecurringRule>;
-  /**
-   * Statused occurrences for an arbitrary range (e.g. a navigated calendar
-   * month that may fall outside the default window). Runs the engine with the
-   * current data so screens never call the engine themselves (invariant #9).
-   */
-  occurrencesForRange: (range: DateRange) => Occurrence[];
-  derived: {
-    total: number;
-    balances: Record<string, number>;
-    monthIn: number;
-    monthOut: number;
-    // Phase 2 derived — screens read these; they never call an engine (invariant #9).
-    occurrences: Occurrence[];
-    upcoming: Occurrence[];
-    overdue: Occurrence[];
-    safeToSpend: SafeToSpendResult;
-    projectedCashflow: CashflowProjection;
-  };
-}
-
-const DataContext = createContext<DataContextValue | null>(null);
-
 export function DataProvider({ children }: { children: ReactNode }) {
   const db = getDB();
   const repo = useMemo(() => new FinanceRepository(db), [db]);
@@ -106,8 +60,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const today = todayIso();
     // Bounded occurrence window: a 12-month look-back so overdue unpaid items are
     // found, plus 3 months forward for upcoming + this-month cash-flow. Never
-    // scans from epoch. NOTE: the Calendar (Step 8) navigates arbitrary months and
-    // will compute its own month's occurrences; Step 6 only needs this window.
+    // scans from epoch. NOTE: the Calendar navigates arbitrary months and computes
+    // its own month's occurrences via occurrencesForRange; this window is the
+    // standard one Home reads.
     const occWindow: DateRange = occurrenceWindow(today);
 
     const occurrences = computeOccurrences(rules, txns, overrides, occWindow, today);
@@ -151,12 +106,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 
-export function useData(): DataContextValue {
-  const ctx = useContext(DataContext);
-  if (!ctx) throw new Error("useData must be used within DataProvider");
-  return ctx;
-}
-
 /**
  * Bounded [from, to] window for occurrence status: a 12-month look-back (so
  * overdue unpaid items are generated) plus 3 months forward (upcoming + this
@@ -169,13 +118,4 @@ function occurrenceWindow(today: string): DateRange {
     return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
   };
   return { from: monthRange(shift(-12)).from, to: monthRange(shift(3)).to };
-}
-
-/** Convenience: currency formatting bound to the current settings. */
-export function useCurrency() {
-  const { settings } = useData();
-  return {
-    symbol: settings?.currencySymbol ?? "Rs",
-    locale: settings?.locale ?? "en-PK",
-  };
 }

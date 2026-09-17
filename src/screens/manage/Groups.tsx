@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useData } from "@/state/DataProvider";
+import { useData } from "@/state/dataContext";
 import { Button, Card, Field, Pill, SectionTitle, SelectInput, Sheet, TextInput } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { IntegrityError } from "@/data/repository";

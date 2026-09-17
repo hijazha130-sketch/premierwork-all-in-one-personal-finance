@@ -1,20 +1,34 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useData } from "@/state/DataProvider";
+import { useData } from "@/state/dataContext";
 import { Button, Card, Field, SelectInput, TextInput } from "@/components/ui";
 import { defaultCategoryInputs } from "@/data/seed";
 import { parseMajorToMinor } from "@/lib/money";
-import type { AccountType } from "@/domain/types";
+import { todayIso } from "@/lib/period";
+import type { AccountType, RecurringFrequency, TransactionDirection } from "@/domain/types";
 
 /**
  * Setup — the first-run wizard (Section 8). A short, guided sequence, one
  * decision per step: currency → accounts → people (optional) → groups → income
- * (optional). Progress indicator, Back on every step, Skip on optional steps.
- * Finishing lands the user on Home.
+ * (optional) → regular bills (optional). Progress indicator, Back on every step,
+ * Skip on optional steps. Finishing lands the user on Home.
  */
 type DraftAccount = { name: string; type: AccountType; balance: string };
 type DraftPerson = { name: string };
 type DraftIncome = { name: string; amount: string };
+type DraftBill = { name: string; direction: TransactionDirection; amount: string; frequency: RecurringFrequency; startDate: string };
+
+const FREQUENCIES: { value: RecurringFrequency; label: string }[] = [
+  { value: "everyMonth", label: "Monthly" },
+  { value: "everyWeek", label: "Weekly" },
+  { value: "every2Weeks", label: "Every 2 weeks" },
+  { value: "every4Weeks", label: "Every 4 weeks" },
+  { value: "every2Months", label: "Every 2 months" },
+  { value: "everyQuarter", label: "Every 3 months" },
+  { value: "every6Months", label: "Every 6 months" },
+  { value: "everyYear", label: "Yearly" },
+  { value: "oneTime", label: "One time" },
+];
 
 const CURRENCIES = [
   { code: "PKR", symbol: "Rs", locale: "en-PK" },
@@ -25,7 +39,8 @@ const CURRENCIES = [
   { code: "AED", symbol: "AED", locale: "en-AE" },
 ];
 
-const STEPS = ["Currency", "Accounts", "People", "Groups", "Income"];
+const STEPS = ["Currency", "Accounts", "People", "Groups", "Income", "Bills"];
+const OPTIONAL_STEPS = [2, 4, 5]; // People, Income, Bills
 
 export function Setup() {
   const { repo } = useData();
@@ -38,6 +53,7 @@ export function Setup() {
   const [people, setPeople] = useState<DraftPerson[]>([]);
   const [groups, setGroups] = useState(() => defaultCategoryInputs().map((c) => ({ ...c, on: true })));
   const [incomes, setIncomes] = useState<DraftIncome[]>([]);
+  const [bills, setBills] = useState<DraftBill[]>([]);
   const [error, setError] = useState("");
 
   const validAccounts = accounts.filter((a) => a.name.trim());
@@ -64,14 +80,16 @@ export function Setup() {
         locale: currency.locale,
         setupComplete: true,
       });
+      let firstAccountId = "";
       for (const a of validAccounts) {
-        await repo.createAccount({
+        const created = await repo.createAccount({
           name: a.name.trim(),
           type: a.type,
           openingBalance: parseMajorToMinor(a.balance || "0") ?? 0,
           currencyCode: currency.code,
           archived: false,
         });
+        if (!firstAccountId) firstAccountId = created.id;
       }
       for (const p of people.filter((p) => p.name.trim())) {
         await repo.createPerson({ name: p.name.trim(), archived: false });
@@ -91,6 +109,26 @@ export function Setup() {
           defaultAmount: inc.amount ? parseMajorToMinor(inc.amount) ?? undefined : undefined,
           archived: false,
         });
+      }
+      // Regular bills & income become repeating rules against the first account
+      // (they can be refined — group, account, person — later in Money → Repeating).
+      if (firstAccountId) {
+        for (const b of bills) {
+          const amount = parseMajorToMinor(b.amount);
+          if (!b.name.trim() || amount == null || amount <= 0) continue;
+          await repo.createRecurringRule({
+            name: b.name.trim(),
+            amount,
+            direction: b.direction,
+            type: b.direction === "in" ? "income" : "expense",
+            categoryId: null,
+            accountId: firstAccountId,
+            personId: null,
+            frequency: b.frequency,
+            anchorDate: b.startDate || todayIso(),
+            endDate: null,
+          });
+        }
       }
       navigate("/");
     } catch (e) {
@@ -212,6 +250,50 @@ export function Setup() {
           </StepShell>
         )}
 
+        {step === 5 && (
+          <StepShell
+            title="Add your regular bills & income"
+            blurb="Optional. Add repeating bills (like rent) and income (like salary). They'll show up with their next date — no re-typing. You can skip and add these later."
+          >
+            <div className="space-y-3">
+              {bills.map((b, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2">
+                  <div className="col-span-12 sm:col-span-4">
+                    <TextInput placeholder="e.g. Rent" value={b.name} onChange={(e) => setBills(upd(bills, i, { name: e.target.value }))} />
+                  </div>
+                  <div className="col-span-4 sm:col-span-2">
+                    <SelectInput value={b.direction} onChange={(e) => setBills(upd(bills, i, { direction: e.target.value as TransactionDirection }))}>
+                      <option value="out">Bill</option>
+                      <option value="in">Income</option>
+                    </SelectInput>
+                  </div>
+                  <div className="col-span-8 sm:col-span-2">
+                    <TextInput inputMode="decimal" placeholder="Amount" value={b.amount} onChange={(e) => setBills(upd(bills, i, { amount: e.target.value }))} />
+                  </div>
+                  <div className="col-span-7 sm:col-span-2">
+                    <SelectInput value={b.frequency} onChange={(e) => setBills(upd(bills, i, { frequency: e.target.value as RecurringFrequency }))}>
+                      {FREQUENCIES.map((f) => (
+                        <option key={f.value} value={f.value}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </SelectInput>
+                  </div>
+                  <div className="col-span-5 sm:col-span-2">
+                    <TextInput type="date" value={b.startDate} onChange={(e) => setBills(upd(bills, i, { startDate: e.target.value }))} />
+                  </div>
+                </div>
+              ))}
+              <button
+                className="text-sm text-gold hover:underline"
+                onClick={() => setBills([...bills, { name: "", direction: "out", amount: "", frequency: "everyMonth", startDate: todayIso() }])}
+              >
+                + Add a bill or income
+              </button>
+            </div>
+          </StepShell>
+        )}
+
         {error && <p className="text-sm text-attention mt-4">{error}</p>}
 
         <div className="flex items-center justify-between mt-8">
@@ -223,8 +305,8 @@ export function Setup() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            {(step === 2 || step === 4) && (
-              <Button variant="ghost" onClick={step === 4 ? finish : next} disabled={busy}>
+            {OPTIONAL_STEPS.includes(step) && (
+              <Button variant="ghost" onClick={step === STEPS.length - 1 ? finish : next} disabled={busy}>
                 Skip
               </Button>
             )}

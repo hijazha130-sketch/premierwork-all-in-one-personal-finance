@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useData, useCurrency } from "@/state/DataProvider";
+import { useData, useCurrency } from "@/state/dataContext";
 import { useCapture } from "@/state/CaptureProvider";
 import { Button, Card } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";

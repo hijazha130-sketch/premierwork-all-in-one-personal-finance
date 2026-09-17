@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/state/ThemeProvider";
-import { DataProvider, useData } from "@/state/DataProvider";
+import { DataProvider } from "@/state/DataProvider";
+import { useData } from "@/state/dataContext";
 import { CaptureProvider } from "@/state/CaptureProvider";
 import { AppShell } from "@/components/AppShell";
 import { Home } from "@/screens/Home";

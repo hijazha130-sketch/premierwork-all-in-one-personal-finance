@@ -47,6 +47,52 @@ of every acceptance criterion.
 11. Every screen usable on phone and desktop — ✅ verified live (sidebar ↔ bottom bar)
 12. Both themes render every screen — ✅ verified live (Midnight + Soft)
 
-## Test summary
+## Test summary (Phase 1)
 
 `npm run test` → 26 tests across 5 files (money, balance, aggregation, period, data-layer), all passing.
+
+---
+
+# Phase 2 — Recurring & Cash Flow (COMPLETE)
+
+Built per `docs/PHASE-2-ARCHITECTURE.md`, Steps 1–11. Transactions remain the single source of
+truth; occurrences are computed, never stored; overrides store exceptions only; screens read
+derived state / call the repository and never do inline money math.
+
+| Area | Where |
+|---|---|
+| §6/§7 Schema (RecurringRule, RecurringOverride, +2 Transaction fields, +Settings) + v2→v3 migration | `domain/types.ts`, `data/db.ts`, `data/backup.ts` |
+| §17.2 Repository (rules/overrides CRUD, archive-vs-delete, override uniqueness, `createTransactionFromOccurrence`) | `data/repository.ts` |
+| §8.1 Recurrence engine (uncapped week stepping, month clamp, oneTime, endDate) | `domain/recurrence.ts` |
+| §8.2 Occurrence status (upcoming/overdue/paid/skipped, paid-by-occurrenceDate) | `domain/occurrences.ts` |
+| §8.3/§8.4 Cash-flow projection + Safe to Spend (unpaid-only guard; FD-1/FD-2/FD-5; honest negatives) | `domain/cashflow.ts` |
+| §11 Calendar day/week totals (no double count) + month grid | `domain/calendar.ts`, `lib/period.ts` |
+| §10 Derived state (occurrences, upcoming, overdue, safeToSpend, cashflow, `occurrencesForRange`) | `state/DataProvider.tsx`, `state/dataContext.ts` |
+| §11 UI: Money → Repeating + Calendar; Home Safe to Spend / needs attention / upcoming; Mark as paid / Skip / Adjust; Setup bills step | `screens/Money.tsx`, `RepeatingRules.tsx`, `Calendar.tsx`, `Home.tsx`, `QuickCapture.tsx`, `Setup.tsx`, `components/OccurrenceActions.tsx` |
+
+## §18 Acceptance criteria — all pass
+
+1. Create a repeating bill → appears under Money → Repeating with a correct **next date** — ✅ verified live; `nextUnpaidByRule` (`tests/occurrences.test.ts`)
+2. Recurrence dates correct for every frequency incl. 31st→Feb and leap year — ✅ `tests/recurrence.test.ts`
+3. Calendar shows each item on its day with per-day/week totals + today marker — ✅ verified live; `tests/calendar.test.ts`, `tests/period.test.ts`
+4. Home shows Safe to spend + overdue/needs-attention + upcoming — ✅ verified live
+5. Mark as paid → one linked transaction, item flips to **paid**, Safe to Spend + projection consistent, balance updates — ✅ `tests/mark-as-paid.test.ts` + verified live
+6. Deleting that transaction returns the item to unpaid/overdue, no orphan state — ✅ `tests/mark-as-paid.test.ts`
+7. Skip removes an item from upcoming without a transaction or money movement — ✅ `tests/mark-as-paid.test.ts` + verified live
+8. No occurrence double-counted (paid not also projected/reserved) — ✅ `tests/cashflow.test.ts`, `tests/calendar.test.ts`, `tests/mark-as-paid.test.ts`
+9. v2→v3 migration additive/non-destructive; export/import incl. rules + overrides — ✅ `tests/data-layer.test.ts`
+10. All Phase 1 tests still pass; new engine tests pass; typecheck clean — ✅
+11. No banned internal term in any screen (automated) — ✅ `npm run lint:buyer-language` (17 files)
+12. Every Phase 2 screen works on phone + desktop, both themes — ✅ verified live
+
+## Test summary (full)
+
+`npm run test` → **84 tests across 11 files**, all passing. New Phase 2 files:
+`recurrence`, `occurrences`, `cashflow`, `calendar`, `recurring-repository`, `mark-as-paid`
+(+ extended `data-layer` and `period`).
+
+Founder decisions applied: FD-1 endOfMonth (settings-driven), FD-2 income not pre-credited,
+FD-3 manual confirmation, FD-4 clamp impossible dates, FD-5 paid independent of cleared,
+FD-6 calendar shows planned + actual distinguished. The weekly 52/26/13 cap was dropped by
+founder decision (spreadsheet artifact, not a financial rule) — the architecture doc was updated
+to match.

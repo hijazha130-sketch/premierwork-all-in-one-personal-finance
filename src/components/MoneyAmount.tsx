@@ -1,5 +1,5 @@
 import { formatMoney } from "@/lib/money";
-import { useCurrency } from "@/state/DataProvider";
+import { useCurrency } from "@/state/dataContext";
 import type { Minor } from "@/domain/types";
 
 /** The single React surface for rendering a money value. */
