@@ -2,6 +2,8 @@ import { createContext, useContext } from "react";
 import type { FinanceRepository } from "@/data/repository";
 import type {
   Account,
+  BudgetPeriodLine,
+  BudgetTemplate,
   Category,
   IncomeSource,
   Person,
@@ -12,6 +14,7 @@ import type {
 } from "@/domain/types";
 import type { Occurrence } from "@/domain/occurrences";
 import type { CashflowProjection, SafeToSpendResult } from "@/domain/cashflow";
+import type { BudgetPeriod, FiftyThirtyTwenty } from "@/domain/budget";
 import type { DateRange } from "@/lib/period";
 
 /**
@@ -35,6 +38,11 @@ export interface DataContextValue {
   peopleById: Map<string, Person>;
   recurringRulesById: Map<string, RecurringRule>;
   occurrencesForRange: (range: DateRange) => Occurrence[];
+  // Phase 3: raw budget stores + month-parameterized helpers (like occurrencesForRange).
+  budgetTemplates: BudgetTemplate[];
+  budgetPeriodLines: BudgetPeriodLine[];
+  budgetForPeriod: (periodKey: string) => BudgetPeriod;
+  fiftyThirtyTwentyForPeriod: (periodKey: string) => FiftyThirtyTwenty;
   derived: {
     total: number;
     balances: Record<string, number>;
@@ -45,6 +53,9 @@ export interface DataContextValue {
     overdue: Occurrence[];
     safeToSpend: SafeToSpendResult;
     projectedCashflow: CashflowProjection;
+    // Phase 3 (current month).
+    budget: BudgetPeriod;
+    fiftyThirtyTwenty: FiftyThirtyTwenty;
   };
 }
 

@@ -7,6 +7,7 @@ import { moneyIn, moneyOut } from "@/domain/aggregation";
 import { currentMonth, monthRange, todayIso, type DateRange } from "@/lib/period";
 import { computeOccurrences, overdue, upcoming, type Occurrence } from "@/domain/occurrences";
 import { projectCashflow, safeToSpend } from "@/domain/cashflow";
+import { computeBudgetPeriod, fiftyThirtyTwenty, type BudgetInput } from "@/domain/budget";
 import { DataContext, type DataContextValue } from "@/state/dataContext";
 
 /**
@@ -27,6 +28,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const transactions = useLiveQuery(() => repo.listTransactions(), []);
   const recurringRules = useLiveQuery(() => repo.listRecurringRules(), []);
   const recurringOverrides = useLiveQuery(() => repo.listRecurringOverrides(), []);
+  const budgetTemplates = useLiveQuery(() => repo.listBudgetTemplates(), []);
+  const budgetPeriodLines = useLiveQuery(() => repo.listBudgetPeriodLines(), []);
 
   // Occurrences for any requested range — used by the Calendar's month paging.
   const occurrencesForRange = useCallback(
@@ -34,6 +37,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
       computeOccurrences(recurringRules ?? [], transactions ?? [], recurringOverrides ?? [], range, todayIso()),
     [recurringRules, transactions, recurringOverrides],
   );
+
+  // One assembled budget input; the month-parameterized helpers close over it so
+  // navigating months does no inline computation in the Plan screens.
+  const budgetInput = useMemo<BudgetInput>(
+    () => ({
+      categories: categories ?? [], // already excludes archived — the editable set
+      templates: budgetTemplates ?? [],
+      lines: budgetPeriodLines ?? [],
+      transactions: transactions ?? [],
+      incomeSources: incomeSources ?? [],
+      settings: {
+        budgetMethod: settings?.budgetMethod ?? "carryOver",
+        periodStartMonth: settings?.periodStartMonth ?? 1,
+        periodStartYear: settings?.periodStartYear ?? Number(todayIso().slice(0, 4)),
+      },
+    }),
+    [categories, budgetTemplates, budgetPeriodLines, transactions, incomeSources, settings],
+  );
+  const budgetForPeriod = useCallback((periodKey: string) => computeBudgetPeriod(budgetInput, periodKey), [budgetInput]);
+  const fiftyThirtyTwentyForPeriod = useCallback((periodKey: string) => fiftyThirtyTwenty(budgetInput, periodKey), [budgetInput]);
 
   // Any undefined live query means the first read hasn't resolved yet.
   const loading =
@@ -43,7 +66,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     people === undefined ||
     incomeSources === undefined ||
     recurringRules === undefined ||
-    recurringOverrides === undefined;
+    recurringOverrides === undefined ||
+    budgetTemplates === undefined ||
+    budgetPeriodLines === undefined;
 
   const value = useMemo<DataContextValue>(() => {
     const acc = accounts ?? [];
@@ -58,6 +83,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // today is injected via todayIso() — the one sanctioned clock read; engines
     // never call new Date() inline (matches the Phase 1 purity pattern).
     const today = todayIso();
+    const currentPeriodKey = today.slice(0, 7); // "YYYY-MM"
     // Bounded occurrence window: a 12-month look-back so overdue unpaid items are
     // found, plus 3 months forward for upcoming + this-month cash-flow. Never
     // scans from epoch. NOTE: the Calendar navigates arbitrary months and computes
@@ -89,6 +115,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       peopleById: new Map(ppl.map((p) => [p.id, p])),
       recurringRulesById: new Map(rules.map((r) => [r.id, r])),
       occurrencesForRange,
+      budgetTemplates: budgetTemplates ?? [],
+      budgetPeriodLines: budgetPeriodLines ?? [],
+      budgetForPeriod,
+      fiftyThirtyTwentyForPeriod,
       derived: {
         total: totalBalance(acc, txns),
         balances: balancesByAccount(acc, txns),
@@ -99,9 +129,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         overdue: overdue(occurrences),
         safeToSpend: safeToSpend(acc, txns, occurrences, today, safeToSpendConfig),
         projectedCashflow: projectCashflow(acc, txns, occurrences, range, today),
+        // Phase 3 (current month): screens read these; navigated months use the helpers.
+        budget: budgetForPeriod(currentPeriodKey),
+        fiftyThirtyTwenty: fiftyThirtyTwentyForPeriod(currentPeriodKey),
       },
     };
-  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange]);
+  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange, budgetTemplates, budgetPeriodLines, budgetForPeriod, fiftyThirtyTwentyForPeriod]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
