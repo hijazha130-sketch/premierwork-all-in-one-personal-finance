@@ -96,3 +96,59 @@ FD-3 manual confirmation, FD-4 clamp impossible dates, FD-5 paid independent of 
 FD-6 calendar shows planned + actual distinguished. The weekly 52/26/13 cap was dropped by
 founder decision (spreadsheet artifact, not a financial rule) — the architecture doc was updated
 to match.
+
+---
+
+# Phase 3 — Budgeting (COMPLETE)
+
+Built per `docs/PHASE-3-ARCHITECTURE.md`, Steps 1–7. Transactions stay the single source of
+truth; "actual/spent" is always `sumTransactions`, never stored. A `BudgetTemplate` holds the
+usual planned amount per category; a `BudgetPeriodLine` stores a per-(month, category) override
+only. Screens read derived state (`budgetForPeriod`, `fiftyThirtyTwentyForPeriod`) and do no
+inline money math.
+
+Delivered across five step commits on `main`:
+
+| Step | Commit | What shipped |
+|---|---|---|
+| 3 | `0a07439` | budget engine — carry-over / zero-based / 50-30-20 |
+| 4 | `ad840b0` | budget derived state |
+| 5 | `c34a8e0` | Plan → Budget monthly view |
+| 6 | `d730ad3` | Plan → 50/30/20 view |
+| 7 | `2b72657` | Setup budget step, method toggle, polish + verification |
+
+| Area | Where |
+|---|---|
+| §6/§7 Schema (BudgetTemplate, BudgetPeriodLine `[periodKey+categoryId]`, PeriodKey) + v3→v4 migration | `domain/types.ts`, `data/db.ts`, `data/backup.ts` |
+| §17 Repository (template + period-line CRUD, upsert semantics) | `data/repository.ts` |
+| §8 Budget engine (effectivePlanned, actualFor via sumTransactions, carry-over walk, computeBudgetPeriod, expectedIncome, leftToAssign, fiftyThirtyTwenty, share) | `domain/budget.ts` |
+| §10 Derived state (budgetForPeriod, fiftyThirtyTwentyForPeriod, derived.budget / derived.fiftyThirtyTwenty) | `state/DataProvider.tsx`, `state/dataContext.ts` |
+| §11 UI: Plan → Budget (Planned/Spent/Left, inline edit, carry-in note, copy last month, left-to-assign) + 50/30/20; Setup budget step; More budgeting toggle | `screens/Plan.tsx`, `FiftyThirtyTwenty.tsx`, `Setup.tsx`, `More.tsx` |
+
+## §18 Acceptance criteria — 12/12 pass
+
+1. Plan replaces the placeholder with a working Budget + 50/30/20 switch — ✅ verified live
+2. Budget view shows Planned / Spent / Left per group and in the summary — ✅ verified live (Rent & Home Planned 15,000 · Spent 8,000 · Left 7,000)
+3. Planned is editable inline; writes the usual, or a "just this month" override — ✅ verified live
+4. Spent is always real activity (`sumTransactions`), never stored — ✅ `tests/budget.test.ts`
+5. Carry-over shows the carried-in / short-by note from last month — ✅ verified live (Oct "carried in Rs 7,000 from last month")
+6. Zero-based shows "Left to assign" and no carry-in — ✅ verified live; `tests/budget.test.ts`
+7. Month navigation (prev / this month / next) works — ✅ verified live
+8. "Copy last month" seeds this month's amounts — ✅ verified live
+9. 50/30/20 shows income + needs/wants/savings as a share of income with target markers — ✅ verified live (income 100,000; Needs 8,000 = 8% vs 50%)
+10. Untagged groups surface a "Not yet sorted" nudge to /groups — ✅ verified live
+11. Setup has an optional, skippable budget step; method + amounts persist at Finish — ✅ verified live
+12. Settings (More) exposes the method toggle in plain words, saved live — ✅ verified live
+
+## Test summary (full)
+
+`npm run test` → **104 tests across 13 files**, all passing. New Phase 3 files:
+`budget`, `budget-repository` (+ extended `data-layer` for the v3→v4 migration). Typecheck,
+buyer-language (19 files) and build all clean.
+
+Founder decisions applied: FD-3.1 paycheck planner deferred to Phase 3b (monthly is primary),
+FD-3.2 zero-based expected income = planned income lines (fallback `IncomeSource.defaultAmount`),
+FD-3.3 carry-over carries an overspend forward, FD-3.4 savings/debt categories participate in
+budget + left-to-assign, FD-3.5 seed a new month from the template plus a "copy last month" action.
+The method toggle reads "Roll leftover into next month" (carry-over) vs "Give every rupee a job"
+(zero-based) — never internal words. v3→v4 migration is additive / non-destructive.
