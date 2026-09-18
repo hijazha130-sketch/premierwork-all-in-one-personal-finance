@@ -11,7 +11,7 @@ import { Button, Card, SectionTitle, Segmented } from "@/components/ui";
  * setup; the backup safety net (JSON export / import); theme; and app info.
  */
 export function More() {
-  const { settings } = useData();
+  const { settings, repo } = useData();
   const { theme, setTheme } = useTheme();
   const fileRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>("");
@@ -63,6 +63,20 @@ export function More() {
           options={[
             { value: "soft", label: "Soft" },
             { value: "midnight", label: "Midnight" },
+          ]}
+        />
+      </Card>
+
+      <Card>
+        <h2 className="font-serif text-xl text-ink mb-2">Budgeting</h2>
+        <p className="text-muted text-sm mb-4">Choose how leftover money works in your plan.</p>
+        <Segmented
+          ariaLabel="How leftover money works"
+          value={settings?.budgetMethod ?? "carryOver"}
+          onChange={(m) => repo.saveSettings({ budgetMethod: m })}
+          options={[
+            { value: "carryOver", label: "Roll leftover into next month" },
+            { value: "zeroBased", label: "Give every rupee a job" },
           ]}
         />
       </Card>

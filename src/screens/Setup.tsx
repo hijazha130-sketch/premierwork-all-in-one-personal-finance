@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useData } from "@/state/dataContext";
-import { Button, Card, Field, SelectInput, TextInput } from "@/components/ui";
+import { Button, Card, Field, Segmented, SelectInput, TextInput } from "@/components/ui";
 import { defaultCategoryInputs } from "@/data/seed";
 import { parseMajorToMinor } from "@/lib/money";
 import { todayIso } from "@/lib/period";
-import type { AccountType, RecurringFrequency, TransactionDirection } from "@/domain/types";
+import type { AccountType, BudgetMethod, RecurringFrequency, TransactionDirection } from "@/domain/types";
 
 /**
  * Setup — the first-run wizard (Section 8). A short, guided sequence, one
@@ -39,8 +39,8 @@ const CURRENCIES = [
   { code: "AED", symbol: "AED", locale: "en-AE" },
 ];
 
-const STEPS = ["Currency", "Accounts", "People", "Groups", "Income", "Bills"];
-const OPTIONAL_STEPS = [2, 4, 5]; // People, Income, Bills
+const STEPS = ["Currency", "Accounts", "People", "Groups", "Income", "Bills", "Budget"];
+const OPTIONAL_STEPS = [2, 4, 5, 6]; // People, Income, Bills, Budget
 
 export function Setup() {
   const { repo } = useData();
@@ -54,7 +54,12 @@ export function Setup() {
   const [groups, setGroups] = useState(() => defaultCategoryInputs().map((c) => ({ ...c, on: true })));
   const [incomes, setIncomes] = useState<DraftIncome[]>([]);
   const [bills, setBills] = useState<DraftBill[]>([]);
+  const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>("carryOver");
+  const [budgets, setBudgets] = useState<Record<string, string>>({}); // group name -> planned amount
   const [error, setError] = useState("");
+
+  // The kept spend groups the budget step can plan (not income).
+  const budgetableGroups = groups.filter((g) => g.on && g.bucket !== "income");
 
   const validAccounts = accounts.filter((a) => a.name.trim());
 
@@ -78,6 +83,7 @@ export function Setup() {
         currencyCode: currency.code,
         currencySymbol: currency.symbol,
         locale: currency.locale,
+        budgetMethod,
         setupComplete: true,
       });
       let firstAccountId = "";
@@ -94,14 +100,24 @@ export function Setup() {
       for (const p of people.filter((p) => p.name.trim())) {
         await repo.createPerson({ name: p.name.trim(), archived: false });
       }
+      const categoryByName = new Map<string, string>();
       for (const g of groups.filter((g) => g.on)) {
-        await repo.createCategory({
+        const created = await repo.createCategory({
           name: g.name,
           bucket: g.bucket,
           needsWantsSavings: g.needsWantsSavings,
           color: g.color,
           archived: false,
         });
+        categoryByName.set(g.name, created.id);
+      }
+      // Optional monthly budget: set the usual planned amount per group.
+      for (const g of budgetableGroups) {
+        const amount = parseMajorToMinor(budgets[g.name] ?? "");
+        const categoryId = categoryByName.get(g.name);
+        if (categoryId && amount != null && amount > 0) {
+          await repo.setBudgetTemplate(categoryId, amount);
+        }
       }
       for (const inc of incomes.filter((i) => i.name.trim())) {
         await repo.createIncomeSource({
@@ -290,6 +306,49 @@ export function Setup() {
               >
                 + Add a bill or income
               </button>
+            </div>
+          </StepShell>
+        )}
+
+        {step === 6 && (
+          <StepShell
+            title="Set your monthly budget"
+            blurb="Optional. Plan what you'll spend on each group — you'll see spent and left fill in from your real activity. You can change all of this anytime in Plan."
+          >
+            <div className="space-y-5">
+              <div>
+                <span className="block text-sm font-medium text-ink mb-2">How should leftover money work?</span>
+                <Segmented
+                  ariaLabel="How leftover money works"
+                  value={budgetMethod}
+                  onChange={setBudgetMethod}
+                  options={[
+                    { value: "carryOver", label: "Roll leftover into next month" },
+                    { value: "zeroBased", label: "Give every rupee a job" },
+                  ]}
+                />
+              </div>
+              {budgetableGroups.length === 0 ? (
+                <p className="text-sm text-muted">Keep some spending groups in the previous step to plan a budget.</p>
+              ) : (
+                <div className="space-y-2">
+                  {budgetableGroups.map((g) => (
+                    <div key={g.name} className="flex items-center gap-3">
+                      <span className="flex flex-1 min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: g.color }} aria-hidden />
+                        <span className="truncate text-ink">{g.name}</span>
+                      </span>
+                      <TextInput
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={budgets[g.name] ?? ""}
+                        onChange={(e) => setBudgets({ ...budgets, [g.name]: e.target.value })}
+                        className="w-32 text-right"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </StepShell>
         )}
