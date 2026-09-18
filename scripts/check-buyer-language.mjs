@@ -23,6 +23,10 @@ const BANNED = [
   "projection",
   "engine",
   "rule",
+  // Phase 3 internal terms — the UI says "Planned", "Spent", "Left", "Left to assign".
+  "variance",
+  "template",
+  "period line",
 ];
 
 // Allowlist: files/paths that are internal-only tooling, if any.

@@ -33,17 +33,6 @@ export function ComingSoon({
   );
 }
 
-export function Plan() {
-  return (
-    <ComingSoon
-      overline="Plan"
-      title="What's planned"
-      blurb="Soon: upcoming bills, repeating payments, and the plan your money follows through the month."
-      items={["Upcoming bills & repeating payments", "Planned vs Spent for each group", "Your month at a glance"]}
-    />
-  );
-}
-
 export function Grow() {
   return (
     <ComingSoon
