@@ -13,11 +13,14 @@ import type { FinanceDB } from "@/data/db";
 import type {
   Account,
   BaseRecord,
+  BudgetPeriodLine,
+  BudgetTemplate,
   Category,
   IncomeSource,
   IsoDate,
   Minor,
   OverrideAction,
+  PeriodKey,
   Person,
   RecurringOverride,
   RecurringRule,
@@ -481,6 +484,74 @@ export class FinanceRepository {
       recurringRuleId: rule.id,
       occurrenceDate, // the scheduled date it fulfills (matches even if paid early/late)
     });
+  }
+
+  // --- Budgets (Phase 3) --------------------------------------------------
+  // Budgets store only targets — a planned amount per category. "Actual" is
+  // never stored; it is always the transaction aggregation. Templates hold the
+  // usual monthly amount; period lines override it for one specific month.
+
+  async listBudgetTemplates(): Promise<BudgetTemplate[]> {
+    return this.db.budgetTemplates.toArray();
+  }
+
+  /** The template for a category, if the user has set one. */
+  async getBudgetTemplate(categoryId: string): Promise<BudgetTemplate | undefined> {
+    return this.db.budgetTemplates.where("categoryId").equals(categoryId).first();
+  }
+
+  /**
+   * Upsert the usual planned amount for a category — exactly one template per
+   * category (updates in place if one exists, never duplicates).
+   */
+  async setBudgetTemplate(categoryId: string, plannedAmount: Minor): Promise<BudgetTemplate> {
+    const existing = await this.getBudgetTemplate(categoryId);
+    if (existing) {
+      const updated: BudgetTemplate = { ...existing, plannedAmount, updatedAt: Date.now() };
+      await this.db.budgetTemplates.put(updated);
+      return updated;
+    }
+    const rec = stampNew<BudgetTemplate>({ categoryId, plannedAmount });
+    await this.db.budgetTemplates.put(rec);
+    return rec;
+  }
+
+  async deleteBudgetTemplate(categoryId: string): Promise<void> {
+    await this.db.budgetTemplates.where("categoryId").equals(categoryId).delete();
+  }
+
+  async listBudgetPeriodLines(periodKey?: PeriodKey): Promise<BudgetPeriodLine[]> {
+    if (periodKey) return this.db.budgetPeriodLines.where("periodKey").equals(periodKey).toArray();
+    return this.db.budgetPeriodLines.toArray();
+  }
+
+  async getBudgetPeriodLine(periodKey: PeriodKey, categoryId: string): Promise<BudgetPeriodLine | undefined> {
+    return this.db.budgetPeriodLines.where("[periodKey+categoryId]").equals([periodKey, categoryId]).first();
+  }
+
+  /**
+   * Upsert the planned amount for one (month, category) — exactly one line per
+   * (periodKey, categoryId), enforced via the compound index (updates in place).
+   */
+  async setBudgetPeriodLine(input: {
+    periodKey: PeriodKey;
+    categoryId: string;
+    plannedAmount: Minor;
+  }): Promise<BudgetPeriodLine> {
+    const existing = await this.getBudgetPeriodLine(input.periodKey, input.categoryId);
+    if (existing) {
+      const updated: BudgetPeriodLine = { ...existing, plannedAmount: input.plannedAmount, updatedAt: Date.now() };
+      await this.db.budgetPeriodLines.put(updated);
+      return updated;
+    }
+    const rec = stampNew<BudgetPeriodLine>({ ...input });
+    await this.db.budgetPeriodLines.put(rec);
+    return rec;
+  }
+
+  async deleteBudgetPeriodLine(periodKey: PeriodKey, categoryId: string): Promise<void> {
+    const existing = await this.getBudgetPeriodLine(periodKey, categoryId);
+    if (existing) await this.db.budgetPeriodLines.delete(existing.id);
   }
 }
 
