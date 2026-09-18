@@ -171,3 +171,34 @@ export interface RecurringOverride extends BaseRecord {
   adjustedAmount?: Minor; // when action = "adjust"
   adjustedDate?: IsoDate; // when action = "adjust" (moved to another day)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Budgeting (Budgeting Architecture §7)
+// ---------------------------------------------------------------------------
+
+/**
+ * A month period key, "YYYY-MM" (e.g. "2026-09"). Budget planned amounts are
+ * keyed per month; "actual" is always derived from transactions in that month.
+ */
+export type PeriodKey = string;
+
+/**
+ * The reusable default planned amount for a category — the "usual" monthly
+ * budget. At most one per category (enforced in the repository). Editing it
+ * changes the default for every month that has no explicit override.
+ */
+export interface BudgetTemplate extends BaseRecord {
+  categoryId: string; // FK -> Category.id (unique: one template per category)
+  plannedAmount: Minor; // the usual monthly planned amount, >= 0
+}
+
+/**
+ * A per-(month, category) override of the planned amount for one specific month
+ * (exceptions only — the same pattern as Phase 2's RecurringOverride, so months
+ * are never pre-provisioned). At most one per (periodKey, categoryId).
+ */
+export interface BudgetPeriodLine extends BaseRecord {
+  periodKey: PeriodKey; // "YYYY-MM"
+  categoryId: string; // FK -> Category.id
+  plannedAmount: Minor; // overrides the template for THIS month, >= 0
+}

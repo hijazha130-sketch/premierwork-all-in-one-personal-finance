@@ -7,6 +7,8 @@ import type { FinanceDB } from "@/data/db";
 import { SCHEMA_VERSION } from "@/data/db";
 import type {
   Account,
+  BudgetPeriodLine,
+  BudgetTemplate,
   Category,
   IncomeSource,
   Person,
@@ -30,21 +32,36 @@ export interface BackupFile {
     // Phase 2 (additive): omitted from older backups, tolerated on import.
     recurringRules: RecurringRule[];
     recurringOverrides: RecurringOverride[];
+    // Phase 3 (additive): omitted from older backups, tolerated on import.
+    budgetTemplates: BudgetTemplate[];
+    budgetPeriodLines: BudgetPeriodLine[];
   };
 }
 
 export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
-  const [settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides] =
-    await Promise.all([
-      db.settings.toArray(),
-      db.accounts.toArray(),
-      db.categories.toArray(),
-      db.people.toArray(),
-      db.incomeSources.toArray(),
-      db.transactions.toArray(),
-      db.recurringRules.toArray(),
-      db.recurringOverrides.toArray(),
-    ]);
+  const [
+    settings,
+    accounts,
+    categories,
+    people,
+    incomeSources,
+    transactions,
+    recurringRules,
+    recurringOverrides,
+    budgetTemplates,
+    budgetPeriodLines,
+  ] = await Promise.all([
+    db.settings.toArray(),
+    db.accounts.toArray(),
+    db.categories.toArray(),
+    db.people.toArray(),
+    db.incomeSources.toArray(),
+    db.transactions.toArray(),
+    db.recurringRules.toArray(),
+    db.recurringOverrides.toArray(),
+    db.budgetTemplates.toArray(),
+    db.budgetPeriodLines.toArray(),
+  ]);
   return {
     app: "premierwork-all-in-one-personal-finance",
     schemaVersion: SCHEMA_VERSION,
@@ -58,6 +75,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
       transactions,
       recurringRules,
       recurringOverrides,
+      budgetTemplates,
+      budgetPeriodLines,
     },
   };
 }
@@ -94,6 +113,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
       db.transactions,
       db.recurringRules,
       db.recurringOverrides,
+      db.budgetTemplates,
+      db.budgetPeriodLines,
     ],
     async () => {
       await Promise.all([
@@ -105,6 +126,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.transactions.clear(),
         db.recurringRules.clear(),
         db.recurringOverrides.clear(),
+        db.budgetTemplates.clear(),
+        db.budgetPeriodLines.clear(),
       ]);
       await Promise.all([
         db.settings.bulkPut(data.settings ?? []),
@@ -115,6 +138,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.transactions.bulkPut(data.transactions ?? []),
         db.recurringRules.bulkPut(data.recurringRules ?? []),
         db.recurringOverrides.bulkPut(data.recurringOverrides ?? []),
+        db.budgetTemplates.bulkPut(data.budgetTemplates ?? []),
+        db.budgetPeriodLines.bulkPut(data.budgetPeriodLines ?? []),
       ]);
     },
   );

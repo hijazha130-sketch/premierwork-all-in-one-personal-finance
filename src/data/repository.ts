@@ -78,7 +78,7 @@ export class FinanceRepository {
       periodStartMonth: new Date().getMonth() + 1,
       periodStartYear: new Date().getFullYear(),
       locale: "en-PK",
-      schemaVersion: 3,
+      schemaVersion: 4,
       setupComplete: false,
       safeToSpendHorizon: "endOfMonth",
       ...patch,

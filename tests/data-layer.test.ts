@@ -124,7 +124,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect(cat?.name).toBe("Food"); // data preserved
     expect(cat?.needsWantsSavings).toBe("none"); // 1→2 additive migration applied
     const settings = await db.settings.get("s1");
-    expect(settings?.schemaVersion).toBe(3); // migrated all the way to current
+    expect(settings?.schemaVersion).toBe(4); // migrated all the way to current
     expect(settings?.safeToSpendHorizon).toBe("endOfMonth"); // 2→3 additive default
     db.close();
   });
@@ -166,12 +166,68 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect(tx?.occurrenceDate).toBeNull();
     // Settings gained the horizon + new schema version.
     const settings = await db.settings.get("s1");
-    expect(settings?.schemaVersion).toBe(3);
+    expect(settings?.schemaVersion).toBe(4); // migrated all the way to current
     expect(settings?.safeToSpendHorizon).toBe("endOfMonth");
     // New (empty) tables exist and are queryable.
     expect(await db.recurringRules.count()).toBe(0);
     expect(await db.recurringOverrides.count()).toBe(0);
     db.close();
+  });
+
+  it("migrates a v3 database to v4 additively, without data loss", async () => {
+    const name = dbName();
+
+    // Stand up a v3-shaped database (Phase 2 schema; no budget tables yet).
+    const v3 = new Dexie(name);
+    v3.version(3).stores({
+      settings: "id",
+      accounts: "id, name, type, archived",
+      categories: "id, name, bucket, needsWantsSavings, archived",
+      people: "id, name, archived",
+      incomeSources: "id, name, archived",
+      transactions:
+        "id, date, accountId, categoryId, personId, type, direction, transferGroupId, cleared, recurringRuleId",
+      recurringRules: "id, name, accountId, categoryId, personId, frequency, active, archived",
+      recurringOverrides: "id, ruleId, occurrenceDate, [ruleId+occurrenceDate]",
+    });
+    await v3.open();
+    await v3.table("categories").put({ id: "c1", name: "Groceries", bucket: "expenses", needsWantsSavings: "needs", color: "#fff", archived: false, createdAt: 0, updatedAt: 0 });
+    await v3.table("recurringRules").put({
+      id: "r1", name: "Rent", amount: 50000_00, direction: "out", type: "expense",
+      categoryId: "c1", accountId: "a1", personId: null, frequency: "everyMonth",
+      anchorDate: "2026-01-01", endDate: null, active: true, archived: false,
+      goalId: null, debtId: null, investmentId: null, createdAt: 0, updatedAt: 0,
+    });
+    await v3.table("settings").put({ id: "s1", currencyCode: "PKR", currencySymbol: "Rs", schemaVersion: 3, safeToSpendHorizon: "endOfMonth", setupComplete: true, createdAt: 0, updatedAt: 0 });
+    v3.close();
+
+    // Open the current schema; the 3→4 migration runs on startup.
+    const db = createDB(name);
+    // Existing data intact.
+    expect((await db.categories.get("c1"))?.name).toBe("Groceries");
+    expect((await db.recurringRules.get("r1"))?.amount).toBe(50000_00);
+    // Settings gained the new schema version.
+    expect((await db.settings.get("s1"))?.schemaVersion).toBe(4);
+    // New (empty) budget tables exist and are queryable.
+    expect(await db.budgetTemplates.count()).toBe(0);
+    expect(await db.budgetPeriodLines.count()).toBe(0);
+    db.close();
+  });
+
+  it("export/import round-trips budget templates and period lines", async () => {
+    const db1 = createDB(dbName());
+    await db1.budgetTemplates.put({ id: "bt1", categoryId: "c1", plannedAmount: 15000_00, createdAt: 0, updatedAt: 0 });
+    await db1.budgetPeriodLines.put({ id: "bl1", periodKey: "2026-09", categoryId: "c1", plannedAmount: 20000_00, createdAt: 0, updatedAt: 0 });
+    const backup = await exportDatabase(db1);
+    expect(backup.data.budgetTemplates).toHaveLength(1);
+    expect(backup.data.budgetPeriodLines).toHaveLength(1);
+    db1.close();
+
+    const db2 = createDB(dbName());
+    await importDatabase(db2, backup);
+    const roundTrip = await exportDatabase(db2);
+    expect(roundTrip.data).toEqual(backup.data);
+    db2.close();
   });
 
   it("export/import round-trips recurring rules and overrides", async () => {

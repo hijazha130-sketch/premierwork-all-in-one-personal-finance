@@ -13,6 +13,8 @@ interface DBOptions {
 }
 import type {
   Account,
+  BudgetPeriodLine,
+  BudgetTemplate,
   Category,
   IncomeSource,
   Person,
@@ -23,7 +25,7 @@ import type {
 } from "@/domain/types";
 
 /** The current app/data schema version. Bump when adding a migration. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export class FinanceDB extends Dexie {
   settings!: Table<Settings, string>;
@@ -35,6 +37,9 @@ export class FinanceDB extends Dexie {
   // Phase 2 (additive): recurring rules + their per-occurrence exceptions.
   recurringRules!: Table<RecurringRule, string>;
   recurringOverrides!: Table<RecurringOverride, string>;
+  // Phase 3 (additive): budget templates + per-month planned-amount overrides.
+  budgetTemplates!: Table<BudgetTemplate, string>;
+  budgetPeriodLines!: Table<BudgetPeriodLine, string>;
 
   constructor(name = "premierwork-finance", options?: DBOptions) {
     super(name, options as ConstructorParameters<typeof Dexie>[1]);
@@ -106,6 +111,24 @@ export class FinanceDB extends Dexie {
           .modify((s: Partial<Settings>) => {
             if (s.safeToSpendHorizon == null) s.safeToSpendHorizon = "endOfMonth";
             s.schemaVersion = 3;
+          });
+      });
+
+    // --- Migration 3 → 4 (Phase 3) ------------------------------------------
+    // Additive, non-destructive: add the budget-template + per-month
+    // budget-line tables. Nothing existing changes — budgets don't exist until
+    // the user sets them — so the upgrade only records the new schemaVersion.
+    this.version(4)
+      .stores({
+        budgetTemplates: "id, categoryId",
+        budgetPeriodLines: "id, periodKey, categoryId, [periodKey+categoryId]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("settings")
+          .toCollection()
+          .modify((s: Partial<Settings>) => {
+            s.schemaVersion = 4;
           });
       });
   }
