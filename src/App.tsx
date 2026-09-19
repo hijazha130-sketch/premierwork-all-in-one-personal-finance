@@ -7,7 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { Home } from "@/screens/Home";
 import { Money } from "@/screens/Money";
 import { Plan } from "@/screens/Plan";
-import { Grow } from "@/screens/ComingSoon";
+import { WealthView } from "@/screens/WealthView";
 import { More } from "@/screens/More";
 import { Setup } from "@/screens/Setup";
 import { Accounts } from "@/screens/manage/Accounts";
@@ -46,7 +46,7 @@ export default function App() {
                   <Route index element={<Home />} />
                   <Route path="money" element={<Money />} />
                   <Route path="plan" element={<Plan />} />
-                  <Route path="grow" element={<Grow />} />
+                  <Route path="grow" element={<WealthView />} />
                   <Route path="more" element={<More />} />
                   <Route path="setup" element={<Setup />} />
                   <Route path="accounts" element={<Accounts />} />

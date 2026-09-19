@@ -17,7 +17,7 @@ const NAV = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
   { to: "/money", label: "Money", icon: MoneyIcon },
   { to: "/plan", label: "Plan", icon: PlanIcon },
-  { to: "/grow", label: "Grow", icon: GrowIcon },
+  { to: "/grow", label: "Wealth", icon: GrowIcon },
   { to: "/more", label: "More", icon: MoreIcon },
 ];
 

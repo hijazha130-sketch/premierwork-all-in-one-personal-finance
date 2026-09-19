@@ -1,8 +1,9 @@
 import { SectionTitle } from "@/components/ui";
 
 /**
- * Tasteful placeholder for the Plan and Grow destinations. The navigation frame
- * is complete in Phase 0; these areas fill in during Phases 2-6 (Section 5).
+ * Tasteful placeholder component kept for any not-yet-built destination. Phase 0
+ * shipped the full nav frame; Plan (Phase 3) and Grow/Wealth (Phase 5) now carry
+ * real content, so this has no current caller — retained for future areas.
  */
 export function ComingSoon({
   overline,
@@ -30,16 +31,5 @@ export function ComingSoon({
         </ul>
       </div>
     </div>
-  );
-}
-
-export function Grow() {
-  return (
-    <ComingSoon
-      overline="Grow"
-      title="How your money could grow"
-      blurb="Soon: goals you're saving toward, debt payoff progress, and a view of your wealth over time."
-      items={["Goals & savings progress", "Debt progress & payoff plan", "How your money could grow"]}
-    />
   );
 }
