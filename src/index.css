@@ -23,6 +23,10 @@
     /* Wallpaper tint (§3): defaults to the base canvas, so "None" = today. The
        runtime overrides this token with the chosen tint's triplet. */
     --wallpaper: var(--surface-base);
+    /* Two-part card shadow (§1). Midnight runs slightly deeper so cards still
+       lift off the dark canvas — a black shadow on black needs more strength. */
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 12px 32px rgb(0 0 0 / 0.14);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.1), 0 20px 48px rgb(0 0 0 / 0.2);
     color-scheme: dark;
   }
 
@@ -37,6 +41,9 @@
     --attention: 176 110 59; /* #B06E3B */
     --border-hairline: 228 220 204; /* #E4DCCC */
     --wallpaper: var(--surface-base);
+    /* Two-part card shadow (§1): tight contact + wide ambient lift. */
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 12px 32px rgb(0 0 0 / 0.1);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.06), 0 20px 48px rgb(0 0 0 / 0.14);
     color-scheme: light;
   }
 

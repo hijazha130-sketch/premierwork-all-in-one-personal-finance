@@ -21,6 +21,8 @@ export default {
         positive: "rgb(var(--positive) / <alpha-value>)",
         attention: "rgb(var(--attention) / <alpha-value>)",
         hairline: "rgb(var(--border-hairline) / <alpha-value>)",
+        // The active wallpaper tint as a colour utility (§3): bg-wallpaper.
+        wallpaper: "rgb(var(--wallpaper) / <alpha-value>)",
       },
       fontFamily: {
         // Editorial titles + the single hero number (§4). Playfair Display.
@@ -50,9 +52,9 @@ export default {
       },
       boxShadow: {
         // §1 the two-part shadow: tight contact (anchors the edge) + wide ambient
-        // (the lift). One without the other looks wrong.
-        card: "0 1px 2px rgb(0 0 0 / 0.05), 0 12px 32px rgb(0 0 0 / 0.10)",
-        lift: "0 2px 4px rgb(0 0 0 / 0.06), 0 20px 48px rgb(0 0 0 / 0.14)",
+        // (the lift). Driven by per-theme CSS tokens so Midnight lifts deeper.
+        card: "var(--shadow)",
+        lift: "var(--shadow-lift)",
         sheet: "0 -8px 40px rgb(0 0 0 / 0.24)",
       },
     },
