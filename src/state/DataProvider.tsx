@@ -8,6 +8,8 @@ import { currentMonth, monthRange, todayIso, type DateRange } from "@/lib/period
 import { computeOccurrences, overdue, upcoming, type Occurrence } from "@/domain/occurrences";
 import { projectCashflow, safeToSpend } from "@/domain/cashflow";
 import { computeBudgetPeriod, fiftyThirtyTwenty, type BudgetInput } from "@/domain/budget";
+import { computeGoals } from "@/domain/goals";
+import { computeDebtPlan } from "@/domain/debt";
 import { DataContext, type DataContextValue } from "@/state/dataContext";
 
 /**
@@ -30,6 +32,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const recurringOverrides = useLiveQuery(() => repo.listRecurringOverrides(), []);
   const budgetTemplates = useLiveQuery(() => repo.listBudgetTemplates(), []);
   const budgetPeriodLines = useLiveQuery(() => repo.listBudgetPeriodLines(), []);
+  const goals = useLiveQuery(() => repo.listGoals(), []);
+  const debts = useLiveQuery(() => repo.listDebts(), []);
 
   // Occurrences for any requested range — used by the Calendar's month paging.
   const occurrencesForRange = useCallback(
@@ -68,7 +72,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     recurringRules === undefined ||
     recurringOverrides === undefined ||
     budgetTemplates === undefined ||
-    budgetPeriodLines === undefined;
+    budgetPeriodLines === undefined ||
+    goals === undefined ||
+    debts === undefined;
 
   const value = useMemo<DataContextValue>(() => {
     const acc = accounts ?? [];
@@ -78,6 +84,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const txns = transactions ?? [];
     const rules = recurringRules ?? [];
     const overrides = recurringOverrides ?? [];
+    const gls = goals ?? [];
+    const dbts = debts ?? [];
     const range = monthRange(currentMonth()); // current month, for month in/out and the cash-flow horizon
 
     // today is injected via todayIso() — the one sanctioned clock read; engines
@@ -97,6 +105,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       mode: settings?.safeToSpendHorizon ?? "endOfMonth", // FD-1 default
       rollingDays: settings?.safeToSpendRollingDays, // used only for "rollingDays"
       // FD-2: expected income is not pre-credited (creditExpectedIncome omitted -> off).
+      safetyFloor: settings?.safetyFloor ?? 0, // FD-4.3: soft emergency cushion
     } as const;
 
     return {
@@ -119,6 +128,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       budgetPeriodLines: budgetPeriodLines ?? [],
       budgetForPeriod,
       fiftyThirtyTwentyForPeriod,
+      goals: gls,
+      debts: dbts,
       derived: {
         total: totalBalance(acc, txns),
         balances: balancesByAccount(acc, txns),
@@ -132,9 +143,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Phase 3 (current month): screens read these; navigated months use the helpers.
         budget: budgetForPeriod(currentPeriodKey),
         fiftyThirtyTwenty: fiftyThirtyTwentyForPeriod(currentPeriodKey),
+        // Phase 4: goal progress + the debt payoff plan (strategy + extra from settings).
+        goalsProgress: computeGoals(gls, txns, today),
+        debtPlan: computeDebtPlan(
+          dbts,
+          { strategy: settings?.debtStrategy ?? "avalanche", monthlyExtra: settings?.debtMonthlyExtra ?? 0 },
+          today,
+        ),
       },
     };
-  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange, budgetTemplates, budgetPeriodLines, budgetForPeriod, fiftyThirtyTwentyForPeriod]);
+  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange, budgetTemplates, budgetPeriodLines, budgetForPeriod, fiftyThirtyTwentyForPeriod, goals, debts]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

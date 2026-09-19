@@ -5,6 +5,8 @@ import type {
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
+  Debt,
+  Goal,
   IncomeSource,
   Person,
   RecurringOverride,
@@ -15,6 +17,8 @@ import type {
 import type { Occurrence } from "@/domain/occurrences";
 import type { CashflowProjection, SafeToSpendResult } from "@/domain/cashflow";
 import type { BudgetPeriod, FiftyThirtyTwenty } from "@/domain/budget";
+import type { GoalsRollup } from "@/domain/goals";
+import type { DebtPlan } from "@/domain/debt";
 import type { DateRange } from "@/lib/period";
 
 /**
@@ -43,6 +47,9 @@ export interface DataContextValue {
   budgetPeriodLines: BudgetPeriodLine[];
   budgetForPeriod: (periodKey: string) => BudgetPeriod;
   fiftyThirtyTwentyForPeriod: (periodKey: string) => FiftyThirtyTwenty;
+  // Phase 4: goals & debts (progress/payoff are derived below).
+  goals: Goal[];
+  debts: Debt[];
   derived: {
     total: number;
     balances: Record<string, number>;
@@ -56,6 +63,9 @@ export interface DataContextValue {
     // Phase 3 (current month).
     budget: BudgetPeriod;
     fiftyThirtyTwenty: FiftyThirtyTwenty;
+    // Phase 4.
+    goalsProgress: GoalsRollup;
+    debtPlan: DebtPlan;
   };
 }
 

@@ -150,3 +150,28 @@ describe("Safe to Spend (§8.4) — horizon modes", () => {
     expect(r.horizonEnd).toBe("2026-06-30");
   });
 });
+
+describe("Safe to Spend (§8.3) — Safety Floor (FD-4.3, soft)", () => {
+  it("subtracts the floor exactly, and floor 0 leaves the number unchanged", () => {
+    const accounts = accountsWith(100000_00);
+    const occurrences: Occurrence[] = [
+      occ({ date: "2026-06-20", direction: "out", amount: 30000_00, status: "upcoming" }),
+    ];
+    const base = safeToSpend(accounts, [], occurrences, TODAY, { mode: "endOfMonth" });
+    expect(base.amount).toBe(70000_00); // 100,000 - 30,000
+    expect(base.safetyFloor).toBe(0);
+
+    const floor0 = safeToSpend(accounts, [], occurrences, TODAY, { mode: "endOfMonth", safetyFloor: 0 });
+    expect(floor0.amount).toBe(base.amount); // floor 0 changes nothing
+
+    const withFloor = safeToSpend(accounts, [], occurrences, TODAY, { mode: "endOfMonth", safetyFloor: 25000_00 });
+    expect(withFloor.safetyFloor).toBe(25000_00);
+    expect(withFloor.amount).toBe(45000_00); // exactly base − floor (70,000 − 25,000)
+  });
+
+  it("the floor can push Safe to Spend negative — shown honestly, never clamped", () => {
+    const accounts = accountsWith(20000_00);
+    const r = safeToSpend(accounts, [], [], TODAY, { mode: "endOfMonth", safetyFloor: 50000_00 });
+    expect(r.amount).toBe(-30000_00); // 20,000 − 0 commitments − 50,000
+  });
+});

@@ -76,23 +76,29 @@ export interface SafeToSpendConfig {
   rollingDays?: number; // used only when mode = "rollingDays"
   /** FD-2: default false — do NOT pre-credit expected income. */
   creditExpectedIncome?: boolean;
+  /** Phase 4, FD-4.3: the emergency cushion to reserve (soft; default 0). */
+  safetyFloor?: Minor;
 }
 
 export interface SafeToSpendResult {
   amount: Minor; // MAY be negative — returned honestly, never clamped (§15)
   reserved: Occurrence[]; // the unpaid out-commitments subtracted (for a breakdown)
   reservedTotal: Minor; // Σ of the reserved commitments (for a one-line "set aside" note)
+  safetyFloor: Minor; // the cushion reserved (for a breakdown; 0 when unset)
   horizonEnd: IsoDate; // the last day considered
 }
 
 /**
  * Safe to spend now, given upcoming commitments.
  *   amount = clearedBalance − Σ(unpaid OUT commitments due on/before horizonEnd)
+ *            − safetyFloor
  *            [+ Σ expected IN within horizon, only if creditExpectedIncome]
  *
  * The reserve INCLUDES overdue unpaid items (you still owe them). "paid" excludes
  * an occurrence regardless of the fulfilling transaction's cleared flag (FD-5).
- * The result may be negative and is returned as-is (§15).
+ * The Safety Floor (FD-4.3) is a soft reserve: it reduces the number so the
+ * cushion is never counted as spendable — never a hard block. The result may be
+ * negative and is returned as-is (§15).
  */
 export function safeToSpend(
   accounts: Account[],
@@ -110,14 +116,15 @@ export function safeToSpend(
     .sort(byScheduledDate);
 
   const reservedTotal = sumMinor(reserved.map((o) => o.amount));
-  let amount = subMinor(balance, reservedTotal);
+  const safetyFloor = config.safetyFloor ?? 0;
+  let amount = subMinor(subMinor(balance, reservedTotal), safetyFloor);
 
   if (config.creditExpectedIncome) {
     const expectedIn = unpaid.filter((o) => o.direction === "in" && o.date <= horizonEnd);
     amount = addMinor(amount, sumMinor(expectedIn.map((o) => o.amount)));
   }
 
-  return { amount, reserved, reservedTotal, horizonEnd };
+  return { amount, reserved, reservedTotal, safetyFloor, horizonEnd };
 }
 
 /** Resolve the horizon's last day from the chosen mode (FD-1). */
