@@ -12,6 +12,8 @@
 import type { FinanceDB } from "@/data/db";
 import type {
   Account,
+  Asset,
+  AssetValuation,
   BaseRecord,
   BudgetPeriodLine,
   BudgetTemplate,
@@ -28,6 +30,7 @@ import type {
   RecurringRule,
   Settings,
   Transaction,
+  TransactionDirection,
 } from "@/domain/types";
 
 export function newId(): string {
@@ -740,6 +743,131 @@ export class FinanceRepository {
       note: input.note,
       cleared: input.cleared ?? true,
       debtId: debt.id,
+    });
+  }
+
+  // --- Assets (Phase 5) ---------------------------------------------------
+  // An asset stores only WHAT it is. Its value is NEVER stored on the asset — it
+  // comes from the latest AssetValuation with asOf <= the date (Step 3). Its
+  // optional accountId is informational and never values it.
+
+  async listAssets(includeArchived = false): Promise<Asset[]> {
+    const all = await this.db.assets.toArray();
+    return includeArchived ? all : all.filter((a) => !a.archived);
+  }
+
+  async getAsset(id: string): Promise<Asset | undefined> {
+    return this.db.assets.get(id);
+  }
+
+  async createAsset(
+    data: Omit<Asset, keyof BaseRecord | "archived"> & Partial<Pick<Asset, "archived">>,
+  ): Promise<Asset> {
+    const rec = stampNew<Asset>({ archived: false, ...data });
+    await this.db.assets.put(rec);
+    return rec;
+  }
+
+  async updateAsset(id: string, patch: Partial<Asset>): Promise<void> {
+    const existing = await this.db.assets.get(id);
+    if (!existing) throw new IntegrityError("That asset no longer exists.");
+    await this.db.assets.update(id, { ...patch, updatedAt: Date.now() });
+  }
+
+  async archiveAsset(id: string): Promise<void> {
+    await this.updateAsset(id, { archived: true });
+  }
+  async restoreAsset(id: string): Promise<void> {
+    await this.updateAsset(id, { archived: false });
+  }
+
+  /** True when a transaction is linked to this asset, or it has any valuation. */
+  async isAssetInUse(id: string): Promise<boolean> {
+    const txCount = await this.db.transactions.filter((t) => t.investmentId === id).count();
+    if (txCount > 0) return true;
+    const valCount = await this.db.assetValuations.where("assetId").equals(id).count();
+    return valCount > 0;
+  }
+
+  /**
+   * Hard-delete an asset only when nothing references it (no linked transaction
+   * and no valuation) — otherwise throw; archive is the safe path. Mirrors the
+   * dimension archive-vs-delete rule.
+   */
+  async deleteAsset(id: string): Promise<void> {
+    if (await this.isAssetInUse(id)) {
+      throw new IntegrityError("This asset has a recorded value or activity — archive it instead.");
+    }
+    await this.db.assets.delete(id);
+  }
+
+  // --- Asset valuations (stated value observations) -----------------------
+  // A valuation is an input, like a transaction. At most one per (assetId, asOf),
+  // enforced via the [assetId+asOf] index (latest write wins, in place).
+
+  /** All valuations for an asset, sorted by asOf (ascending). */
+  async listValuationsForAsset(assetId: string): Promise<AssetValuation[]> {
+    const all = await this.db.assetValuations.where("assetId").equals(assetId).toArray();
+    return all.sort((a, b) => (a.asOf < b.asOf ? -1 : a.asOf > b.asOf ? 1 : 0));
+  }
+
+  async getValuation(assetId: string, asOf: IsoDate): Promise<AssetValuation | undefined> {
+    return this.db.assetValuations.where("[assetId+asOf]").equals([assetId, asOf]).first();
+  }
+
+  /**
+   * Append a stated value for an asset at a date — exactly one per (assetId,
+   * asOf); a second value for the same date updates it in place (latest wins).
+   */
+  async addValuation(assetId: string, input: { value: Minor; asOf: IsoDate }): Promise<AssetValuation> {
+    if (!(await this.db.assets.get(assetId))) {
+      throw new IntegrityError("That asset no longer exists.");
+    }
+    const existing = await this.getValuation(assetId, input.asOf);
+    if (existing) {
+      const updated: AssetValuation = { ...existing, value: input.value, updatedAt: Date.now() };
+      await this.db.assetValuations.put(updated);
+      return updated;
+    }
+    const rec = stampNew<AssetValuation>({ assetId, value: input.value, asOf: input.asOf });
+    await this.db.assetValuations.put(rec);
+    return rec;
+  }
+
+  async deleteValuation(id: string): Promise<void> {
+    await this.db.assetValuations.delete(id);
+  }
+
+  /**
+   * Record a contribution toward an asset (e.g. buying into an investment): a
+   * normal transaction with investmentId set. Informational only — it NEVER
+   * changes any valuation, and value comes solely from valuations.
+   */
+  async recordAssetContribution(
+    asset: Asset,
+    input: {
+      amount: Minor;
+      direction: TransactionDirection;
+      accountId: string;
+      date: IsoDate;
+      categoryId?: string | null;
+      personId?: string | null;
+      note?: string;
+      cleared?: boolean;
+    },
+  ): Promise<Transaction> {
+    return this.createTransaction({
+      date: input.date,
+      amount: input.amount,
+      direction: input.direction,
+      type: input.direction === "in" ? "income" : "expense",
+      categoryId: input.categoryId ?? null,
+      accountId: input.accountId,
+      personId: input.personId ?? null,
+      source: "manual",
+      note: input.note,
+      cleared: input.cleared ?? true,
+      investmentId: asset.id,
     });
   }
 }
