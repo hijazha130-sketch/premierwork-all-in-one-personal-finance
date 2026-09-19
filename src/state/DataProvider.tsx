@@ -10,6 +10,7 @@ import { projectCashflow, safeToSpend } from "@/domain/cashflow";
 import { computeBudgetPeriod, fiftyThirtyTwenty, type BudgetInput } from "@/domain/budget";
 import { computeGoals } from "@/domain/goals";
 import { computeDebtPlan } from "@/domain/debt";
+import { assetValueAt, netWorthNow, netWorthSeries } from "@/domain/wealth";
 import { DataContext, type DataContextValue } from "@/state/dataContext";
 
 /**
@@ -34,6 +35,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const budgetPeriodLines = useLiveQuery(() => repo.listBudgetPeriodLines(), []);
   const goals = useLiveQuery(() => repo.listGoals(), []);
   const debts = useLiveQuery(() => repo.listDebts(), []);
+  const assets = useLiveQuery(() => repo.listAssets(), []);
+  const valuations = useLiveQuery(() => repo.listAllValuations(), []);
 
   // Occurrences for any requested range — used by the Calendar's month paging.
   const occurrencesForRange = useCallback(
@@ -74,7 +77,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     budgetTemplates === undefined ||
     budgetPeriodLines === undefined ||
     goals === undefined ||
-    debts === undefined;
+    debts === undefined ||
+    assets === undefined ||
+    valuations === undefined;
 
   const value = useMemo<DataContextValue>(() => {
     const acc = accounts ?? [];
@@ -86,7 +91,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const overrides = recurringOverrides ?? [];
     const gls = goals ?? [];
     const dbts = debts ?? [];
+    const asts = assets ?? [];
+    const vals = valuations ?? [];
     const range = monthRange(currentMonth()); // current month, for month in/out and the cash-flow horizon
+    const balances = balancesByAccount(acc, txns); // computed once; reused by net worth
 
     // today is injected via todayIso() — the one sanctioned clock read; engines
     // never call new Date() inline (matches the Phase 1 purity pattern).
@@ -130,9 +138,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       fiftyThirtyTwentyForPeriod,
       goals: gls,
       debts: dbts,
+      assets: asts,
+      valuations: vals,
       derived: {
         total: totalBalance(acc, txns),
-        balances: balancesByAccount(acc, txns),
+        balances,
         monthIn: moneyIn(txns, range),
         monthOut: moneyOut(txns, range),
         occurrences,
@@ -150,9 +160,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           { strategy: settings?.debtStrategy ?? "avalanche", monthlyExtra: settings?.debtMonthlyExtra ?? 0 },
           today,
         ),
+        // Phase 5: net worth now + the last-12-months monthly trend. Fed the
+        // already-computed balances so account balances are derived once.
+        netWorth: netWorthNow(acc, balances, asts, vals, dbts, today),
+        netWorthSeries: netWorthSeries(twelveMonthRange(today), acc, txns, asts, vals, dbts),
+        assetValues: Object.fromEntries(asts.map((a) => [a.id, assetValueAt(a.id, vals, today)])),
       },
     };
-  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange, budgetTemplates, budgetPeriodLines, budgetForPeriod, fiftyThirtyTwentyForPeriod, goals, debts]);
+  }, [repo, loading, settings, accounts, categories, people, incomeSources, transactions, recurringRules, recurringOverrides, occurrencesForRange, budgetTemplates, budgetPeriodLines, budgetForPeriod, fiftyThirtyTwentyForPeriod, goals, debts, assets, valuations]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
@@ -169,4 +184,14 @@ function occurrenceWindow(today: string): DateRange {
     return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
   };
   return { from: monthRange(shift(-12)).from, to: monthRange(shift(3)).to };
+}
+
+/** The last 12 months (inclusive of the current one) for the net-worth trend. */
+function twelveMonthRange(today: string): DateRange {
+  const [y, m] = today.split("-").map(Number);
+  const shift = (delta: number) => {
+    const idx = y * 12 + (m - 1) + delta;
+    return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+  };
+  return { from: monthRange(shift(-11)).from, to: monthRange(shift(0)).to };
 }

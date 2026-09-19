@@ -805,6 +805,11 @@ export class FinanceRepository {
   // A valuation is an input, like a transaction. At most one per (assetId, asOf),
   // enforced via the [assetId+asOf] index (latest write wins, in place).
 
+  /** Every valuation across all assets (the wealth engine reads the full set). */
+  async listAllValuations(): Promise<AssetValuation[]> {
+    return this.db.assetValuations.toArray();
+  }
+
   /** All valuations for an asset, sorted by asOf (ascending). */
   async listValuationsForAsset(assetId: string): Promise<AssetValuation[]> {
     const all = await this.db.assetValuations.where("assetId").equals(assetId).toArray();
