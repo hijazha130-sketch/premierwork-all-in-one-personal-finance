@@ -81,9 +81,12 @@ export class FinanceRepository {
       periodStartMonth: new Date().getMonth() + 1,
       periodStartYear: new Date().getFullYear(),
       locale: "en-PK",
-      schemaVersion: 4,
+      schemaVersion: 5,
       setupComplete: false,
       safeToSpendHorizon: "endOfMonth",
+      safetyFloor: 0,
+      debtStrategy: "avalanche",
+      debtMonthlyExtra: 0,
       ...patch,
     });
     await this.db.settings.put(created);

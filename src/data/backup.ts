@@ -10,6 +10,8 @@ import type {
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
+  Debt,
+  Goal,
   IncomeSource,
   Person,
   RecurringOverride,
@@ -35,6 +37,9 @@ export interface BackupFile {
     // Phase 3 (additive): omitted from older backups, tolerated on import.
     budgetTemplates: BudgetTemplate[];
     budgetPeriodLines: BudgetPeriodLine[];
+    // Phase 4 (additive): omitted from older backups, tolerated on import.
+    goals: Goal[];
+    debts: Debt[];
   };
 }
 
@@ -50,6 +55,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
     recurringOverrides,
     budgetTemplates,
     budgetPeriodLines,
+    goals,
+    debts,
   ] = await Promise.all([
     db.settings.toArray(),
     db.accounts.toArray(),
@@ -61,6 +68,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
     db.recurringOverrides.toArray(),
     db.budgetTemplates.toArray(),
     db.budgetPeriodLines.toArray(),
+    db.goals.toArray(),
+    db.debts.toArray(),
   ]);
   return {
     app: "premierwork-all-in-one-personal-finance",
@@ -77,6 +86,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
       recurringOverrides,
       budgetTemplates,
       budgetPeriodLines,
+      goals,
+      debts,
     },
   };
 }
@@ -115,6 +126,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
       db.recurringOverrides,
       db.budgetTemplates,
       db.budgetPeriodLines,
+      db.goals,
+      db.debts,
     ],
     async () => {
       await Promise.all([
@@ -128,6 +141,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.recurringOverrides.clear(),
         db.budgetTemplates.clear(),
         db.budgetPeriodLines.clear(),
+        db.goals.clear(),
+        db.debts.clear(),
       ]);
       await Promise.all([
         db.settings.bulkPut(data.settings ?? []),
@@ -140,6 +155,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.recurringOverrides.bulkPut(data.recurringOverrides ?? []),
         db.budgetTemplates.bulkPut(data.budgetTemplates ?? []),
         db.budgetPeriodLines.bulkPut(data.budgetPeriodLines ?? []),
+        db.goals.bulkPut(data.goals ?? []),
+        db.debts.bulkPut(data.debts ?? []),
       ]);
     },
   );

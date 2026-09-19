@@ -19,6 +19,9 @@ export interface BaseRecord {
 
 export type BudgetMethod = "zeroBased" | "carryOver";
 
+/** How the debt payoff plan directs any extra payment (Phase 4). */
+export type DebtStrategy = "snowball" | "avalanche" | "custom";
+
 /**
  * How far ahead "Safe to spend" reserves upcoming commitments (Phase 2, FD-1).
  * Default is end of the current month.
@@ -38,6 +41,10 @@ export interface Settings extends BaseRecord {
   // Phase 2: the window "Safe to spend" reserves against (FD-1, default endOfMonth).
   safeToSpendHorizon: SafeToSpendHorizon;
   safeToSpendRollingDays?: number; // used only when horizon = "rollingDays"
+  // Phase 4 (additive): the emergency cushion + the debt payoff plan settings.
+  safetyFloor: Minor; // minimum balance to protect from "Safe to spend" (default 0)
+  debtStrategy: DebtStrategy; // how the extra payment is directed (default "avalanche")
+  debtMonthlyExtra: Minor; // extra beyond minimums, applied by strategy (default 0)
 }
 
 export type AccountType =
@@ -201,4 +208,42 @@ export interface BudgetPeriodLine extends BaseRecord {
   periodKey: PeriodKey; // "YYYY-MM"
   categoryId: string; // FK -> Category.id
   plannedAmount: Minor; // overrides the template for THIS month, >= 0
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Goals, Debt & Safety Floor (Phase 4 Architecture §7)
+// ---------------------------------------------------------------------------
+
+/**
+ * A savings goal (sinking fund) — stores only the target and its terms. How much
+ * is saved is NEVER stored; it is derived from transactions linked via `goalId`
+ * (startingAmount + Σ contributions). A goal can never disagree with the ledger.
+ */
+export interface Goal extends BaseRecord {
+  name: string;
+  targetAmount: Minor; // the goal, > 0
+  startingAmount: Minor; // already-saved at creation (default 0)
+  targetDate: IsoDate | null; // optional deadline
+  monthlyContribution: Minor | null; // optional planned monthly set-aside
+  categoryId: string | null; // optional savings category
+  archived: boolean;
+  completedAt: number | null; // epoch ms when target reached (derived-set)
+}
+
+/**
+ * A debt to pay off — stores only the balance and its terms. The payoff plan
+ * (schedule, debt-free date, total interest) is a forecast computed on demand
+ * from these terms plus the plan-level extra/strategy; it is never stored.
+ * Payments are transactions linked via `debtId`. `currentBalance` is the truth
+ * anchor the forecast runs from (user-maintained per FD-4.1).
+ */
+export interface Debt extends BaseRecord {
+  name: string;
+  currentBalance: Minor; // amount owed (truth anchor; FD-4.1)
+  annualInterestRate: number; // annual %, e.g. 24 for 24%/yr
+  minimumPayment: Minor; // required monthly minimum
+  balanceAsOf: IsoDate; // the date currentBalance was entered/updated
+  customOrder: number | null; // ordering for the "custom" strategy
+  archived: boolean;
+  paidOffAt: number | null; // epoch ms when balance reached 0 (derived-set)
 }

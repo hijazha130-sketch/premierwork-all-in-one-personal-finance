@@ -16,6 +16,8 @@ import type {
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
+  Debt,
+  Goal,
   IncomeSource,
   Person,
   RecurringOverride,
@@ -25,7 +27,7 @@ import type {
 } from "@/domain/types";
 
 /** The current app/data schema version. Bump when adding a migration. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export class FinanceDB extends Dexie {
   settings!: Table<Settings, string>;
@@ -40,6 +42,9 @@ export class FinanceDB extends Dexie {
   // Phase 3 (additive): budget templates + per-month planned-amount overrides.
   budgetTemplates!: Table<BudgetTemplate, string>;
   budgetPeriodLines!: Table<BudgetPeriodLine, string>;
+  // Phase 4 (additive): savings goals + debts (progress/payoff are derived).
+  goals!: Table<Goal, string>;
+  debts!: Table<Debt, string>;
 
   constructor(name = "premierwork-finance", options?: DBOptions) {
     super(name, options as ConstructorParameters<typeof Dexie>[1]);
@@ -129,6 +134,28 @@ export class FinanceDB extends Dexie {
           .toCollection()
           .modify((s: Partial<Settings>) => {
             s.schemaVersion = 4;
+          });
+      });
+
+    // --- Migration 4 → 5 (Phase 4) ------------------------------------------
+    // Additive, non-destructive: add the goals + debts tables and default the
+    // three new Settings fields (the emergency cushion + debt payoff plan).
+    // Nothing existing changes — goals/debts don't exist until the user adds
+    // them, and the transactions' goalId/debtId links already exist.
+    this.version(5)
+      .stores({
+        goals: "id, name, archived, categoryId",
+        debts: "id, name, archived",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("settings")
+          .toCollection()
+          .modify((s: Partial<Settings>) => {
+            if (s.safetyFloor == null) s.safetyFloor = 0;
+            if (s.debtStrategy == null) s.debtStrategy = "avalanche";
+            if (s.debtMonthlyExtra == null) s.debtMonthlyExtra = 0;
+            s.schemaVersion = 5;
           });
       });
   }
