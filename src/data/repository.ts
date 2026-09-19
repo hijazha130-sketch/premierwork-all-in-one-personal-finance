@@ -16,6 +16,8 @@ import type {
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
+  Debt,
+  Goal,
   IncomeSource,
   IsoDate,
   Minor,
@@ -555,6 +557,190 @@ export class FinanceRepository {
   async deleteBudgetPeriodLine(periodKey: PeriodKey, categoryId: string): Promise<void> {
     const existing = await this.getBudgetPeriodLine(periodKey, categoryId);
     if (existing) await this.db.budgetPeriodLines.delete(existing.id);
+  }
+
+  // --- Goals (Phase 4) ----------------------------------------------------
+  // A goal stores only a target and its terms. How much is saved is NEVER
+  // stored — it is derived (Step 3) from transactions linked via goalId.
+
+  async listGoals(includeArchived = false): Promise<Goal[]> {
+    const all = await this.db.goals.toArray();
+    return includeArchived ? all : all.filter((g) => !g.archived);
+  }
+
+  async getGoal(id: string): Promise<Goal | undefined> {
+    return this.db.goals.get(id);
+  }
+
+  /** A goal's optional savings category must exist when it is set. */
+  private async assertGoalCategory(categoryId: string | null): Promise<void> {
+    if (categoryId != null && !(await this.db.categories.get(categoryId))) {
+      throw new IntegrityError("That category no longer exists.");
+    }
+  }
+
+  async createGoal(
+    data: Omit<Goal, keyof BaseRecord | "archived" | "completedAt"> &
+      Partial<Pick<Goal, "archived" | "completedAt">>,
+  ): Promise<Goal> {
+    const rec = stampNew<Goal>({ archived: false, completedAt: null, ...data });
+    await this.assertGoalCategory(rec.categoryId);
+    await this.db.goals.put(rec);
+    return rec;
+  }
+
+  async updateGoal(id: string, patch: Partial<Goal>): Promise<void> {
+    const existing = await this.db.goals.get(id);
+    if (!existing) throw new IntegrityError("That goal no longer exists.");
+    if ("categoryId" in patch) await this.assertGoalCategory(patch.categoryId ?? null);
+    await this.db.goals.update(id, { ...patch, updatedAt: Date.now() });
+  }
+
+  async archiveGoal(id: string): Promise<void> {
+    await this.updateGoal(id, { archived: true });
+  }
+  async restoreGoal(id: string): Promise<void> {
+    await this.updateGoal(id, { archived: false });
+  }
+
+  /** True when any transaction is a contribution toward this goal. */
+  async isGoalInUse(id: string): Promise<boolean> {
+    const count = await this.db.transactions.filter((t) => t.goalId === id).count();
+    return count > 0;
+  }
+
+  /**
+   * Hard-delete a goal only when no transaction references it — otherwise throw
+   * (caller should archive), mirroring the dimension archive-vs-delete rule.
+   */
+  async deleteGoal(id: string): Promise<void> {
+    if (await this.isGoalInUse(id)) {
+      throw new IntegrityError("This goal has recorded contributions — archive it instead.");
+    }
+    await this.db.goals.delete(id);
+  }
+
+  // --- Debts (Phase 4) ----------------------------------------------------
+  // A debt stores only the balance and its terms. The payoff plan (schedule,
+  // debt-free date, total interest) is a forecast computed on demand (Step 4),
+  // never stored. Payments are transactions linked via debtId.
+
+  async listDebts(includeArchived = false): Promise<Debt[]> {
+    const all = await this.db.debts.toArray();
+    return includeArchived ? all : all.filter((d) => !d.archived);
+  }
+
+  async getDebt(id: string): Promise<Debt | undefined> {
+    return this.db.debts.get(id);
+  }
+
+  async createDebt(
+    data: Omit<Debt, keyof BaseRecord | "archived" | "paidOffAt" | "customOrder"> &
+      Partial<Pick<Debt, "archived" | "paidOffAt" | "customOrder">>,
+  ): Promise<Debt> {
+    const rec = stampNew<Debt>({ archived: false, paidOffAt: null, customOrder: null, ...data });
+    await this.db.debts.put(rec);
+    return rec;
+  }
+
+  async updateDebt(id: string, patch: Partial<Debt>): Promise<void> {
+    const existing = await this.db.debts.get(id);
+    if (!existing) throw new IntegrityError("That debt no longer exists.");
+    await this.db.debts.update(id, { ...patch, updatedAt: Date.now() });
+  }
+
+  async archiveDebt(id: string): Promise<void> {
+    await this.updateDebt(id, { archived: true });
+  }
+  async restoreDebt(id: string): Promise<void> {
+    await this.updateDebt(id, { archived: false });
+  }
+
+  /** True when any transaction is a payment toward this debt. */
+  async isDebtInUse(id: string): Promise<boolean> {
+    const count = await this.db.transactions.filter((t) => t.debtId === id).count();
+    return count > 0;
+  }
+
+  /**
+   * Hard-delete a debt only when no transaction references it — otherwise throw
+   * (caller should archive), mirroring the dimension archive-vs-delete rule.
+   */
+  async deleteDebt(id: string): Promise<void> {
+    if (await this.isDebtInUse(id)) {
+      throw new IntegrityError("This debt has recorded payments — archive it instead.");
+    }
+    await this.db.debts.delete(id);
+  }
+
+  // --- Linked-transaction helpers (the only way a goal/debt moves money) ---
+  // Both go through createTransaction so integrity checks run and they show up
+  // in balances/aggregation like any manual transaction. No table is written
+  // directly, and neither touches goal/debt stored fields.
+
+  /**
+   * Record money set aside toward a goal: a manual "out" expense with goalId set.
+   * categoryId defaults to the goal's savings category when the caller omits it.
+   * The goal engine (Step 3) sums these by goalId as "saved".
+   */
+  async recordContribution(
+    goal: Goal,
+    input: {
+      amount: Minor;
+      date: IsoDate;
+      accountId: string;
+      categoryId?: string | null;
+      personId?: string | null;
+      note?: string;
+      cleared?: boolean;
+    },
+  ): Promise<Transaction> {
+    return this.createTransaction({
+      date: input.date,
+      amount: input.amount,
+      direction: "out",
+      type: "expense",
+      categoryId: input.categoryId !== undefined ? input.categoryId : goal.categoryId,
+      accountId: input.accountId,
+      personId: input.personId ?? null,
+      source: "manual",
+      note: input.note,
+      cleared: input.cleared ?? true,
+      goalId: goal.id,
+    });
+  }
+
+  /**
+   * Record a debt payment: a manual "out" expense with debtId set. Per FD-4.1
+   * (default), this ONLY logs the payment transaction — it does NOT decrement
+   * debt.currentBalance, which stays user-maintained (the "update balance?"
+   * prompt is Step 6).
+   */
+  async recordDebtPayment(
+    debt: Debt,
+    input: {
+      amount: Minor;
+      date: IsoDate;
+      accountId: string;
+      categoryId?: string | null;
+      personId?: string | null;
+      note?: string;
+      cleared?: boolean;
+    },
+  ): Promise<Transaction> {
+    return this.createTransaction({
+      date: input.date,
+      amount: input.amount,
+      direction: "out",
+      type: "expense",
+      categoryId: input.categoryId ?? null,
+      accountId: input.accountId,
+      personId: input.personId ?? null,
+      source: "manual",
+      note: input.note,
+      cleared: input.cleared ?? true,
+      debtId: debt.id,
+    });
   }
 }
 
