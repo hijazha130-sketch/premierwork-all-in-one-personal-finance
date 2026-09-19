@@ -13,6 +13,8 @@ interface DBOptions {
 }
 import type {
   Account,
+  Asset,
+  AssetValuation,
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
@@ -27,7 +29,7 @@ import type {
 } from "@/domain/types";
 
 /** The current app/data schema version. Bump when adding a migration. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export class FinanceDB extends Dexie {
   settings!: Table<Settings, string>;
@@ -45,6 +47,9 @@ export class FinanceDB extends Dexie {
   // Phase 4 (additive): savings goals + debts (progress/payoff are derived).
   goals!: Table<Goal, string>;
   debts!: Table<Debt, string>;
+  // Phase 5 (additive): assets + their stated value observations (net worth is derived).
+  assets!: Table<Asset, string>;
+  assetValuations!: Table<AssetValuation, string>;
 
   constructor(name = "premierwork-finance", options?: DBOptions) {
     super(name, options as ConstructorParameters<typeof Dexie>[1]);
@@ -156,6 +161,25 @@ export class FinanceDB extends Dexie {
             if (s.debtStrategy == null) s.debtStrategy = "avalanche";
             if (s.debtMonthlyExtra == null) s.debtMonthlyExtra = 0;
             s.schemaVersion = 5;
+          });
+      });
+
+    // --- Migration 5 → 6 (Phase 5) ------------------------------------------
+    // Additive, non-destructive: add the assets + asset-valuations tables. An
+    // asset stores only what it is; its value comes from valuations (net worth
+    // is derived), so nothing existing changes — the upgrade only records the
+    // new schemaVersion.
+    this.version(6)
+      .stores({
+        assets: "id, name, kind, accountId, archived",
+        assetValuations: "id, assetId, asOf, [assetId+asOf]",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("settings")
+          .toCollection()
+          .modify((s: Partial<Settings>) => {
+            s.schemaVersion = 6;
           });
       });
   }

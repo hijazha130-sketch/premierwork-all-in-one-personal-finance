@@ -7,6 +7,8 @@ import type { FinanceDB } from "@/data/db";
 import { SCHEMA_VERSION } from "@/data/db";
 import type {
   Account,
+  Asset,
+  AssetValuation,
   BudgetPeriodLine,
   BudgetTemplate,
   Category,
@@ -40,6 +42,9 @@ export interface BackupFile {
     // Phase 4 (additive): omitted from older backups, tolerated on import.
     goals: Goal[];
     debts: Debt[];
+    // Phase 5 (additive): omitted from older backups, tolerated on import.
+    assets: Asset[];
+    assetValuations: AssetValuation[];
   };
 }
 
@@ -57,6 +62,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
     budgetPeriodLines,
     goals,
     debts,
+    assets,
+    assetValuations,
   ] = await Promise.all([
     db.settings.toArray(),
     db.accounts.toArray(),
@@ -70,6 +77,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
     db.budgetPeriodLines.toArray(),
     db.goals.toArray(),
     db.debts.toArray(),
+    db.assets.toArray(),
+    db.assetValuations.toArray(),
   ]);
   return {
     app: "premierwork-all-in-one-personal-finance",
@@ -88,6 +97,8 @@ export async function exportDatabase(db: FinanceDB): Promise<BackupFile> {
       budgetPeriodLines,
       goals,
       debts,
+      assets,
+      assetValuations,
     },
   };
 }
@@ -128,6 +139,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
       db.budgetPeriodLines,
       db.goals,
       db.debts,
+      db.assets,
+      db.assetValuations,
     ],
     async () => {
       await Promise.all([
@@ -143,6 +156,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.budgetPeriodLines.clear(),
         db.goals.clear(),
         db.debts.clear(),
+        db.assets.clear(),
+        db.assetValuations.clear(),
       ]);
       await Promise.all([
         db.settings.bulkPut(data.settings ?? []),
@@ -157,6 +172,8 @@ export async function importDatabase(db: FinanceDB, backup: unknown): Promise<vo
         db.budgetPeriodLines.bulkPut(data.budgetPeriodLines ?? []),
         db.goals.bulkPut(data.goals ?? []),
         db.debts.bulkPut(data.debts ?? []),
+        db.assets.bulkPut(data.assets ?? []),
+        db.assetValuations.bulkPut(data.assetValuations ?? []),
       ]);
     },
   );

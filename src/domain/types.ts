@@ -247,3 +247,35 @@ export interface Debt extends BaseRecord {
   archived: boolean;
   paidOffAt: number | null; // epoch ms when balance reached 0 (derived-set)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Wealth (net worth & assets)
+// ---------------------------------------------------------------------------
+
+export type AssetKind = "investment" | "property" | "vehicle" | "cash" | "other";
+
+/**
+ * An asset the user owns — stores only WHAT it is, never its value. The value at
+ * any date comes from the latest AssetValuation (see below). `accountId` is an
+ * optional, informational link to an investment Account and is NEVER used to
+ * value the asset (accounts are valued from their transactions, assets from
+ * their valuations — the two never mix).
+ */
+export interface Asset extends BaseRecord {
+  name: string;
+  kind: AssetKind;
+  accountId: string | null; // optional informational link; never a value source
+  note?: string;
+  archived: boolean;
+}
+
+/**
+ * A stated value observation for an asset — an input, like a transaction, never
+ * a derived figure. The asset's value at a date D is the value of its latest
+ * valuation with `asOf ≤ D` (a step function; no interpolation between points).
+ */
+export interface AssetValuation extends BaseRecord {
+  assetId: string; // FK -> Asset.id
+  value: Minor; // the stated value at asOf
+  asOf: IsoDate; // the date this value was observed
+}

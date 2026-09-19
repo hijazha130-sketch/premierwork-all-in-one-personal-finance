@@ -124,7 +124,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect(cat?.name).toBe("Food"); // data preserved
     expect(cat?.needsWantsSavings).toBe("none"); // 1→2 additive migration applied
     const settings = await db.settings.get("s1");
-    expect(settings?.schemaVersion).toBe(5); // migrated all the way to current
+    expect(settings?.schemaVersion).toBe(6); // migrated all the way to current
     expect(settings?.safeToSpendHorizon).toBe("endOfMonth"); // 2→3 additive default
     expect(settings?.safetyFloor).toBe(0); // 4→5 additive default
     expect(settings?.debtStrategy).toBe("avalanche"); // 4→5 additive default
@@ -168,7 +168,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect(tx?.occurrenceDate).toBeNull();
     // Settings gained the horizon + new schema version.
     const settings = await db.settings.get("s1");
-    expect(settings?.schemaVersion).toBe(5); // migrated all the way to current
+    expect(settings?.schemaVersion).toBe(6); // migrated all the way to current
     expect(settings?.safeToSpendHorizon).toBe("endOfMonth");
     // New (empty) tables exist and are queryable.
     expect(await db.recurringRules.count()).toBe(0);
@@ -209,7 +209,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect((await db.categories.get("c1"))?.name).toBe("Groceries");
     expect((await db.recurringRules.get("r1"))?.amount).toBe(50000_00);
     // Settings gained the new schema version.
-    expect((await db.settings.get("s1"))?.schemaVersion).toBe(5);
+    expect((await db.settings.get("s1"))?.schemaVersion).toBe(6);
     // New (empty) budget tables exist and are queryable.
     expect(await db.budgetTemplates.count()).toBe(0);
     expect(await db.budgetPeriodLines.count()).toBe(0);
@@ -241,7 +241,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     await v4.table("settings").put({ id: "s1", currencyCode: "PKR", currencySymbol: "Rs", schemaVersion: 4, safeToSpendHorizon: "endOfMonth", budgetMethod: "carryOver", setupComplete: true, createdAt: 0, updatedAt: 0 });
     v4.close();
 
-    // Open the current schema; the 4→5 migration runs on startup.
+    // Open the current schema; the 4→5 then 5→6 migrations run on startup.
     const db = createDB(name);
     // Existing data intact.
     expect((await db.accounts.get("a1"))?.openingBalance).toBe(1000_00);
@@ -249,7 +249,7 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     // Settings gained the Phase 4 fields + the new schema version, and the
     // Phase 3 setting is untouched.
     const settings = await db.settings.get("s1");
-    expect(settings?.schemaVersion).toBe(5);
+    expect(settings?.schemaVersion).toBe(6);
     expect(settings?.budgetMethod).toBe("carryOver"); // pre-existing, unchanged
     expect(settings?.safetyFloor).toBe(0);
     expect(settings?.debtStrategy).toBe("avalanche");
@@ -258,6 +258,87 @@ describe("data layer — persistence, integrity, backup, migration", () => {
     expect(await db.goals.count()).toBe(0);
     expect(await db.debts.count()).toBe(0);
     db.close();
+  });
+
+  it("migrates a v5 database to v6 additively, without data loss", async () => {
+    const name = dbName();
+
+    // Stand up a v5-shaped database (Phase 4 schema; no assets tables yet).
+    const v5 = new Dexie(name);
+    v5.version(5).stores({
+      settings: "id",
+      accounts: "id, name, type, archived",
+      categories: "id, name, bucket, needsWantsSavings, archived",
+      people: "id, name, archived",
+      incomeSources: "id, name, archived",
+      transactions:
+        "id, date, accountId, categoryId, personId, type, direction, transferGroupId, cleared, recurringRuleId",
+      recurringRules: "id, name, accountId, categoryId, personId, frequency, active, archived",
+      recurringOverrides: "id, ruleId, occurrenceDate, [ruleId+occurrenceDate]",
+      budgetTemplates: "id, categoryId",
+      budgetPeriodLines: "id, periodKey, categoryId, [periodKey+categoryId]",
+      goals: "id, name, archived, categoryId",
+      debts: "id, name, archived",
+    });
+    await v5.open();
+    await v5.table("accounts").put({ id: "a1", name: "Brokerage", type: "investment", openingBalance: 500000_00, currencyCode: "PKR", archived: false, createdAt: 0, updatedAt: 0 });
+    await v5.table("goals").put({ id: "g1", name: "Car", targetAmount: 800000_00, startingAmount: 0, targetDate: null, monthlyContribution: null, categoryId: null, archived: false, completedAt: null, createdAt: 0, updatedAt: 0 });
+    await v5.table("settings").put({ id: "s1", currencyCode: "PKR", currencySymbol: "Rs", schemaVersion: 5, safeToSpendHorizon: "endOfMonth", budgetMethod: "carryOver", safetyFloor: 5000_00, debtStrategy: "snowball", debtMonthlyExtra: 2000_00, setupComplete: true, createdAt: 0, updatedAt: 0 });
+    v5.close();
+
+    // Open the current schema; the 5→6 migration runs on startup.
+    const db = createDB(name);
+    // Existing data intact.
+    expect((await db.accounts.get("a1"))?.openingBalance).toBe(500000_00);
+    expect((await db.goals.get("g1"))?.targetAmount).toBe(800000_00);
+    // Settings gained the new schema version; the Phase 4 fields are untouched.
+    const settings = await db.settings.get("s1");
+    expect(settings?.schemaVersion).toBe(6);
+    expect(settings?.safetyFloor).toBe(5000_00); // pre-existing, unchanged
+    expect(settings?.debtStrategy).toBe("snowball"); // pre-existing, unchanged
+    // New (empty) assets tables exist and are queryable.
+    expect(await db.assets.count()).toBe(0);
+    expect(await db.assetValuations.count()).toBe(0);
+    db.close();
+  });
+
+  it("assets and valuations persist and round-trip through export/import", async () => {
+    const db1 = createDB(dbName());
+    await db1.assets.put({
+      id: "as1", name: "Apartment", kind: "property", accountId: null, note: "Downtown",
+      archived: false, createdAt: 0, updatedAt: 0,
+    });
+    await db1.assetValuations.put({ id: "av1", assetId: "as1", value: 12000000_00, asOf: "2026-09-01", createdAt: 0, updatedAt: 0 });
+    await db1.assetValuations.put({ id: "av2", assetId: "as1", value: 12500000_00, asOf: "2026-12-01", createdAt: 0, updatedAt: 0 });
+    const backup = await exportDatabase(db1);
+    expect(backup.data.assets).toHaveLength(1);
+    expect(backup.data.assetValuations).toHaveLength(2);
+    db1.close();
+
+    const db2 = createDB(dbName());
+    await importDatabase(db2, backup);
+    // Persisted and readable.
+    expect((await db2.assets.get("as1"))?.kind).toBe("property");
+    expect((await db2.assetValuations.get("av2"))?.value).toBe(12500000_00);
+    // Exact round-trip.
+    const roundTrip = await exportDatabase(db2);
+    expect(roundTrip.data).toEqual(backup.data);
+    db2.close();
+  });
+
+  it("imports an older backup that omits assets and valuations", async () => {
+    const db1 = createDB(dbName());
+    const backup = await exportDatabase(db1);
+    // Simulate a pre-Phase-5 backup with the arrays missing entirely.
+    delete (backup.data as Partial<typeof backup.data>).assets;
+    delete (backup.data as Partial<typeof backup.data>).assetValuations;
+
+    const db2 = createDB(dbName());
+    await importDatabase(db2, backup); // must not throw
+    expect(await db2.assets.count()).toBe(0);
+    expect(await db2.assetValuations.count()).toBe(0);
+    db1.close();
+    db2.close();
   });
 
   it("goals and debts persist and round-trip through export/import", async () => {
