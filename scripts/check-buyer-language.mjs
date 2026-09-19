@@ -27,6 +27,12 @@ const BANNED = [
   "variance",
   "template",
   "period line",
+  // Phase 4 internal terms — the UI says "Debt-free date", "Interest you'll pay",
+  // "Pay off highest-rate first" / "Pay off smallest first", "Keep a cushion of…".
+  "amortization",
+  "principal",
+  "snowball",
+  "avalanche",
 ];
 
 // Allowlist: files/paths that are internal-only tooling, if any.

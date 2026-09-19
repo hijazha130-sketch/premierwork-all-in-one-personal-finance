@@ -4,30 +4,31 @@ import { Card, SectionTitle, Segmented } from "@/components/ui";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { EmptyState } from "@/components/EmptyState";
 import { FiftyThirtyTwentyView } from "@/screens/FiftyThirtyTwenty";
+import { GoalsView } from "@/screens/GoalsView";
+import { DebtView } from "@/screens/DebtView";
 import { minorToMajor, parseMajorToMinor } from "@/lib/money";
 import { currentMonth, monthLabel } from "@/lib/period";
 import type { BudgetLine } from "@/domain/budget";
 
-type PlanView = "budget" | "split";
+type PlanView = "budget" | "split" | "goals" | "debt";
+
+const SUBTITLES: Record<PlanView, string> = {
+  budget: "What you meant to spend, next to what you actually did — for each group, this month.",
+  split: "How your spending splits across needs, wants and savings.",
+  goals: "What you're saving toward, and how close you are.",
+  debt: "What you're paying off, when you'll be debt-free, and the interest along the way.",
+};
 
 /**
- * Plan — the budgeting surface. A view switch between the monthly Budget and the
- * 50/30/20 lens. Everything shown is read from derived state (budgetForPeriod);
+ * Plan — the budgeting surface. A view switch across the monthly Budget, the
+ * 50/30/20 lens, Goals and Debt. Everything shown is read from derived state;
  * the screen does no money math itself.
  */
 export function Plan() {
   const [view, setView] = useState<PlanView>("budget");
   return (
     <div className="max-w-3xl space-y-6">
-      <SectionTitle
-        overline="Plan"
-        title="Your plan"
-        subtitle={
-          view === "budget"
-            ? "What you meant to spend, next to what you actually did — for each group, this month."
-            : "How your spending splits across needs, wants and savings."
-        }
-      />
+      <SectionTitle overline="Plan" title="Your plan" subtitle={SUBTITLES[view]} />
       <Segmented
         ariaLabel="View"
         value={view}
@@ -35,9 +36,14 @@ export function Plan() {
         options={[
           { value: "budget", label: "Budget" },
           { value: "split", label: "50/30/20" },
+          { value: "goals", label: "Goals" },
+          { value: "debt", label: "Debt" },
         ]}
       />
-      {view === "budget" ? <BudgetView /> : <FiftyThirtyTwentyView />}
+      {view === "budget" && <BudgetView />}
+      {view === "split" && <FiftyThirtyTwentyView />}
+      {view === "goals" && <GoalsView />}
+      {view === "debt" && <DebtView />}
     </div>
   );
 }

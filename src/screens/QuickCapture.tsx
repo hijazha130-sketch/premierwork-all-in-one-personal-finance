@@ -14,7 +14,7 @@ import type { TransactionType } from "@/domain/types";
  * an existing transaction (edit or delete).
  */
 export function QuickCapture() {
-  const { open, mode, editingId, confirm, close } = useCapture();
+  const { open, mode, editingId, confirm, link, close } = useCapture();
   const { repo, accounts, categories, people, transactions } = useData();
 
   const editing = useMemo(
@@ -50,6 +50,17 @@ export function QuickCapture() {
       setDate(occurrence.displayDate);
       setNote("");
       setShowNote(false);
+    } else if (link) {
+      // A contribution toward a goal or a payment on a debt — always money out.
+      setType("expense");
+      setAmountText("");
+      const defaultCat = link.kind === "goal" ? link.goal.categoryId : null;
+      setCategoryId(defaultCat ?? expenseCategories[0]?.id ?? "");
+      setAccountId(accounts[0]?.id ?? "");
+      setPersonId("");
+      setDate(todayIso());
+      setNote("");
+      setShowNote(false);
     } else if (editing) {
       setType(editing.type);
       setAmountText(String(minorToMajor(editing.amount)));
@@ -72,7 +83,7 @@ export function QuickCapture() {
     }
     setError("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingId, mode, confirm]);
+  }, [open, editingId, mode, confirm, link]);
 
   const isTransfer = type === "transfer";
 
@@ -98,6 +109,20 @@ export function QuickCapture() {
           note: note.trim() || undefined,
           cleared: true,
         });
+      } else if (link) {
+        // A goal contribution or a debt payment — a real "out" transaction with
+        // the goal/debt link set (recordContribution / recordDebtPayment).
+        const common = {
+          amount: amount!,
+          date,
+          accountId,
+          categoryId: categoryId || null,
+          personId: personId || null,
+          note: note.trim() || undefined,
+          cleared: true,
+        };
+        if (link.kind === "goal") await repo.recordContribution(link.goal, common);
+        else await repo.recordDebtPayment(link.debt, common);
       } else if (editing) {
         await repo.updateTransaction(editing.id, {
           amount: amount!,
@@ -153,15 +178,19 @@ export function QuickCapture() {
     ? confirm.rule.type === "income"
       ? "Confirm money in"
       : "Confirm this bill"
-    : editing
-      ? editing.type === "transfer"
-        ? "Edit moved money"
-        : "Edit"
-      : isTransfer
-        ? "Move money"
-        : type === "income"
-          ? "Add money coming in"
-          : "Add a spend";
+    : link
+      ? link.kind === "goal"
+        ? `Set aside for ${link.goal.name}`
+        : `Record a payment on ${link.debt.name}`
+      : editing
+        ? editing.type === "transfer"
+          ? "Edit moved money"
+          : "Edit"
+        : isTransfer
+          ? "Move money"
+          : type === "income"
+            ? "Add money coming in"
+            : "Add a spend";
 
   const activeCategories = type === "income" ? incomeCategories : expenseCategories;
 
@@ -171,7 +200,7 @@ export function QuickCapture() {
         <p className="text-muted">Add an account first, then you can record money here.</p>
       ) : (
         <div className="space-y-5">
-          {!editing && !confirm && (
+          {!editing && !confirm && !link && (
             <Segmented
               ariaLabel="Type"
               value={type}
@@ -282,7 +311,15 @@ export function QuickCapture() {
 
           <div className="flex items-center gap-3 pt-2">
             <Button className="flex-1" onClick={handleSave} disabled={saving}>
-              {confirm ? "Mark as paid" : editing ? "Save changes" : "Save"}
+              {confirm
+                ? "Mark as paid"
+                : link
+                  ? link.kind === "goal"
+                    ? "Set aside"
+                    : "Record payment"
+                  : editing
+                    ? "Save changes"
+                    : "Save"}
             </Button>
             {editing && (
               <Button variant="danger" onClick={handleDelete} disabled={saving}>

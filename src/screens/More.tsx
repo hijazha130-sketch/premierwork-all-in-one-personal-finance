@@ -5,6 +5,7 @@ import { useTheme } from "@/state/ThemeProvider";
 import { getDB } from "@/data/db";
 import { downloadBackup, importDatabaseString } from "@/data/backup";
 import { Button, Card, SectionTitle, Segmented } from "@/components/ui";
+import { minorToMajor, parseMajorToMinor } from "@/lib/money";
 
 /**
  * More (Section 5 & 8). The hub: manage accounts, groups and people; re-run
@@ -82,6 +83,17 @@ export function More() {
       </Card>
 
       <Card>
+        <h2 className="font-serif text-xl text-ink mb-2">Emergency cushion</h2>
+        <p className="text-muted text-sm mb-4">
+          Keep a cushion set aside that “Safe to spend” won’t touch, so it’s always protected.
+        </p>
+        <CushionInput
+          value={settings?.safetyFloor ?? 0}
+          onCommit={(floor) => repo.saveSettings({ safetyFloor: floor })}
+        />
+      </Card>
+
+      <Card>
         <h2 className="font-serif text-xl text-ink mb-2">Backup</h2>
         <p className="text-muted text-sm mb-4">
           Your data lives on this device. Save a backup file you can restore anytime — this is your
@@ -117,5 +129,33 @@ export function More() {
         </p>
       </Card>
     </div>
+  );
+}
+
+/** The emergency-cushion amount; commits the parsed value on blur/Enter. */
+function CushionInput({ value, onCommit }: { value: number; onCommit: (floor: number) => void }) {
+  const [text, setText] = useState(String(minorToMajor(value)));
+  const [last, setLast] = useState(value);
+  if (value !== last) {
+    setLast(value);
+    setText(String(minorToMajor(value)));
+  }
+  function commit() {
+    const amount = parseMajorToMinor(text);
+    if (amount != null && amount >= 0) onCommit(amount);
+    else setText(String(minorToMajor(value)));
+  }
+  return (
+    <label className="flex items-center justify-between gap-3">
+      <span className="text-sm text-ink">Keep at least</span>
+      <input
+        inputMode="decimal"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        className="w-32 rounded-control bg-inset border border-hairline px-3 py-2 text-right text-ink focus:border-gold outline-none min-h-[44px]"
+      />
+    </label>
   );
 }
