@@ -36,12 +36,12 @@ export function Card({ className, children }: { className?: string; children: Re
 
 export function SectionTitle({ overline, title, subtitle }: { overline?: string; title: string; subtitle?: string }) {
   return (
-    <div className="mb-6">
+    <div className="mb-8">
       {overline && (
         <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-2">{overline}</div>
       )}
-      <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{title}</h1>
-      {subtitle && <p className="text-muted mt-3 max-w-md">{subtitle}</p>}
+      <h1 className="font-display text-4xl md:text-5xl text-ink leading-tight">{title}</h1>
+      {subtitle && <p className="text-muted mt-3 max-w-xl">{subtitle}</p>}
     </div>
   );
 }

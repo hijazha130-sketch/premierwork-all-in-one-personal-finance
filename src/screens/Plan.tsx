@@ -27,7 +27,7 @@ const SUBTITLES: Record<PlanView, string> = {
 export function Plan() {
   const [view, setView] = useState<PlanView>("budget");
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="Plan" title="Your plan" subtitle={SUBTITLES[view]} />
       <Segmented
         ariaLabel="View"
@@ -89,7 +89,7 @@ function BudgetView() {
     <div className="space-y-6">
       {/* Month selector */}
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl text-ink">{monthLabel({ year, month }, locale)}</h2>
+        <h2 className="font-display text-2xl text-ink">{monthLabel({ year, month }, locale)}</h2>
         <div className="flex items-center gap-1">
           <button aria-label="Previous month" onClick={() => shift(-1)} className="rounded-control px-3 py-2 text-muted hover:bg-inset hover:text-ink">
             ‹
@@ -144,7 +144,7 @@ function BudgetView() {
       ) : (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-serif text-lg text-ink">By group</h3>
+            <h3 className="font-display text-xl text-ink">By group</h3>
             <button onClick={copyLastMonth} className="text-sm text-gold hover:underline">
               Copy last month
             </button>

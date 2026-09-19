@@ -67,10 +67,10 @@ export function Home() {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-8">
       <div>
         <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-2">{greeting()}</div>
-        <h1 className="font-serif text-3xl md:text-4xl italic text-ink">{greeting()}, there</h1>
+        <h1 className="font-display text-4xl md:text-5xl italic text-ink">{greeting()}, there</h1>
       </div>
 
       {/* Hero: Safe to spend */}
@@ -94,7 +94,7 @@ export function Home() {
       {/* Needs attention (overdue) — only when there is something */}
       {overdue.length > 0 && (
         <Card className="border-attention/40">
-          <h2 className="font-serif text-xl text-ink mb-1">What needs attention</h2>
+          <h2 className="font-display text-2xl text-ink mb-1">What needs attention</h2>
           <p className="text-sm text-muted mb-4">
             {overdue.length === 1 ? "One bill is" : `${overdue.length} bills are`} past due.
           </p>
@@ -114,7 +114,7 @@ export function Home() {
       )}
 
       {/* This month in / out */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <Card>
           <div className="text-xs font-semibold uppercase tracking-widest text-muted mb-3">This month</div>
           <div className="text-sm text-muted">{month}</div>
@@ -133,7 +133,7 @@ export function Home() {
       {upcoming.length > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif text-xl text-ink">Coming up</h2>
+            <h2 className="font-display text-2xl text-ink">Coming up</h2>
             <Link to="/money" className="text-sm text-gold hover:underline">
               See calendar
             </Link>
@@ -157,7 +157,7 @@ export function Home() {
       {hasActivity ? (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif text-xl text-ink">Recent activity</h2>
+            <h2 className="font-display text-2xl text-ink">Recent activity</h2>
             <Link to="/money" className="text-sm text-gold hover:underline">
               See all
             </Link>

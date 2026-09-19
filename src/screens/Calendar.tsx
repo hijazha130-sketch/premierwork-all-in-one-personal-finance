@@ -69,7 +69,7 @@ export function Calendar() {
     <Card>
       {/* Header: month + navigation */}
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-serif text-xl text-ink">{monthLabel({ year, month }, locale)}</h2>
+        <h2 className="font-display text-2xl text-ink">{monthLabel({ year, month }, locale)}</h2>
         <div className="flex items-center gap-1">
           <button
             aria-label="Previous month"
@@ -145,7 +145,7 @@ export function Calendar() {
       {/* Day detail (read-only) */}
       {selected && (
         <div className="mt-6 border-t border-hairline pt-4">
-          <h3 className="font-serif text-lg text-ink mb-3">{formatDateLabel(selected, locale)}</h3>
+          <h3 className="font-display text-xl text-ink mb-3">{formatDateLabel(selected, locale)}</h3>
           {!selectedItems || (selectedItems.planned.length === 0 && selectedItems.actual.length === 0) ? (
             <p className="text-sm text-muted">Nothing on this day.</p>
           ) : (

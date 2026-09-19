@@ -24,7 +24,7 @@ export function People() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="People" title="Who spends in your household" subtitle="Optional. Track who spent what — handy for shared households." />
 
       <div className="flex justify-end">

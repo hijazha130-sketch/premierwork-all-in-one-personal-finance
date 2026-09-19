@@ -21,9 +21,9 @@ export function MoneyAmount({
 
   const sizes = {
     sm: "text-base",
-    md: "text-xl",
-    lg: "text-3xl",
-    hero: "text-5xl md:text-6xl",
+    md: "text-2xl",
+    lg: "text-4xl",
+    hero: "text-6xl md:text-7xl",
   };
   const tones = {
     default: "text-ink",

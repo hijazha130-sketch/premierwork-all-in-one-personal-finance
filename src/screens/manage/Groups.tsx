@@ -39,7 +39,7 @@ export function Groups() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="Groups" title="How your money is grouped" subtitle="The buckets your spending and income fall into. Edit them anytime." />
 
       <div className="flex justify-end">

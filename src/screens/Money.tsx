@@ -84,7 +84,7 @@ export function Money() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle
         overline="Money"
         title="Your money"
@@ -117,7 +117,7 @@ export function Money() {
       {/* Account balances */}
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">Balances</h2>
+          <h2 className="font-display text-2xl text-ink">Balances</h2>
           <Link to="/accounts" className="text-sm text-gold hover:underline">
             Manage accounts
           </Link>
@@ -138,7 +138,7 @@ export function Money() {
 
       {/* Filters */}
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-4">Activity</h2>
+        <h2 className="font-display text-2xl text-ink mb-4">Activity</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
           <SelectInput value={accountId} onChange={(e) => setAccountId(e.target.value)} aria-label="Account">
             <option value="">All accounts</option>

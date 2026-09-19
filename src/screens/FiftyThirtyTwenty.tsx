@@ -40,7 +40,7 @@ export function FiftyThirtyTwentyView() {
     <div className="space-y-6">
       {/* Month selector */}
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl text-ink">{monthLabel({ year, month }, locale)}</h2>
+        <h2 className="font-display text-2xl text-ink">{monthLabel({ year, month }, locale)}</h2>
         <div className="flex items-center gap-1">
           <button aria-label="Previous month" onClick={() => shift(-1)} className="rounded-control px-3 py-2 text-muted hover:bg-inset hover:text-ink">
             ‹
@@ -63,7 +63,7 @@ export function FiftyThirtyTwentyView() {
       </Card>
 
       <Card>
-        <h3 className="font-serif text-lg text-ink mb-4">Your split</h3>
+        <h3 className="font-display text-xl text-ink mb-4">Your split</h3>
         <div className="space-y-5">
           {groups.map((g) => {
             const pct = share(g.amount, split.income);
@@ -90,7 +90,7 @@ export function FiftyThirtyTwentyView() {
       {untagged.length > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-serif text-lg text-ink">Not yet sorted</h3>
+            <h3 className="font-display text-xl text-ink">Not yet sorted</h3>
             <MoneyAmount amount={split.unclassified} size="sm" tone="muted" />
           </div>
           <p className="text-sm text-muted mb-3">

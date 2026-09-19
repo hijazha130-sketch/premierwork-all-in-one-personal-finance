@@ -59,7 +59,7 @@ export function RepeatingRules() {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-serif text-xl text-ink">Repeating bills &amp; income</h2>
+        <h2 className="font-display text-2xl text-ink">Repeating bills &amp; income</h2>
         <Button onClick={() => setAdding(true)}>+ Add</Button>
       </div>
 

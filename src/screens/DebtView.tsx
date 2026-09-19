@@ -27,7 +27,7 @@ export function DebtView() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl text-ink">Your debts</h2>
+        <h2 className="font-display text-2xl text-ink">Your debts</h2>
         <Button variant="ghost" onClick={() => setEditing("new")}>
           Add a debt
         </Button>
@@ -65,7 +65,7 @@ export function DebtView() {
               <div>
                 <div className="text-xs font-semibold uppercase tracking-widest text-muted mb-1">Debt-free date</div>
                 {plan.debtFreeDate ? (
-                  <div className="font-serif text-xl text-ink">{formatDateLabel(plan.debtFreeDate, locale)}</div>
+                  <div className="font-display text-2xl text-ink">{formatDateLabel(plan.debtFreeDate, locale)}</div>
                 ) : (
                   <div className="text-sm text-muted">Not reached at this payment</div>
                 )}
@@ -93,7 +93,7 @@ export function DebtView() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted">#{i + 1}</span>
-                        <h3 className="font-serif text-lg text-ink truncate">{d.name}</h3>
+                        <h3 className="font-display text-xl text-ink truncate">{d.name}</h3>
                       </div>
                       <div className="text-sm text-muted mt-0.5">
                         <MoneyAmount amount={d.currentBalance} size="sm" /> · {d.annualInterestRate}%/yr · min{" "}

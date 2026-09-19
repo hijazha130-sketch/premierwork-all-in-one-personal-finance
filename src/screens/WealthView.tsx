@@ -27,7 +27,7 @@ export function WealthView() {
   const hasOwing = owed.length > 0 || debts.length > 0;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="Grow" title="Your wealth" subtitle="What you own, what you owe, and how it's changing over time." />
 
       {/* Headline net worth + change */}
@@ -47,7 +47,7 @@ export function WealthView() {
       {/* What you own */}
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif text-xl text-ink">What you own</h2>
+          <h2 className="font-display text-2xl text-ink">What you own</h2>
           <Button variant="ghost" onClick={() => setAddingAsset(true)}>
             Add asset
           </Button>
@@ -97,7 +97,7 @@ export function WealthView() {
 
       {/* What you owe */}
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-4">What you owe</h2>
+        <h2 className="font-display text-2xl text-ink mb-4">What you owe</h2>
         {!hasOwing ? (
           <p className="text-sm text-muted">Nothing owed. When you add a debt, it shows here and lowers your net worth.</p>
         ) : (

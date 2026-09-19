@@ -29,11 +29,11 @@ export function More() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="More" title="Settings & tools" subtitle="Manage what your money is grouped into, and keep a safe backup." />
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-4">Manage</h2>
+        <h2 className="font-display text-2xl text-ink mb-4">Manage</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link to="/accounts" className="rounded-control border border-hairline p-4 hover:bg-inset">
             <div className="text-ink font-medium">Accounts</div>
@@ -56,7 +56,7 @@ export function More() {
       </Card>
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-2">Appearance</h2>
+        <h2 className="font-display text-2xl text-ink mb-2">Appearance</h2>
         <p className="text-muted text-sm mb-4">Choose the look that's easy on your eyes.</p>
         <Segmented
           ariaLabel="Theme"
@@ -96,7 +96,7 @@ export function More() {
       </Card>
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-2">Budgeting</h2>
+        <h2 className="font-display text-2xl text-ink mb-2">Budgeting</h2>
         <p className="text-muted text-sm mb-4">Choose how leftover money works in your plan.</p>
         <Segmented
           ariaLabel="How leftover money works"
@@ -110,7 +110,7 @@ export function More() {
       </Card>
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-2">Emergency cushion</h2>
+        <h2 className="font-display text-2xl text-ink mb-2">Emergency cushion</h2>
         <p className="text-muted text-sm mb-4">
           Keep a cushion set aside that “Safe to spend” won’t touch, so it’s always protected.
         </p>
@@ -121,7 +121,7 @@ export function More() {
       </Card>
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-2">Backup</h2>
+        <h2 className="font-display text-2xl text-ink mb-2">Backup</h2>
         <p className="text-muted text-sm mb-4">
           Your data lives on this device. Save a backup file you can restore anytime — this is your
           safety net.
@@ -149,7 +149,7 @@ export function More() {
       </Card>
 
       <Card>
-        <h2 className="font-serif text-xl text-ink mb-2">About</h2>
+        <h2 className="font-display text-2xl text-ink mb-2">About</h2>
         <p className="text-muted text-sm">
           All-in-One Personal Finance by PremierWork. Currency: {settings?.currencySymbol ?? "Rs"} (
           {settings?.currencyCode ?? "PKR"}). All data stays on this device and works offline.

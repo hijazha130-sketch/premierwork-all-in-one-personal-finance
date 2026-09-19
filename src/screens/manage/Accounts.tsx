@@ -35,7 +35,7 @@ export function Accounts() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-8">
       <SectionTitle overline="Accounts" title="Where your money is" subtitle="Everyday, savings, cash, cards — one connected view of every balance." />
 
       <div className="flex justify-end">

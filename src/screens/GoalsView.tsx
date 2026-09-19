@@ -25,7 +25,7 @@ export function GoalsView() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl text-ink">Your goals</h2>
+        <h2 className="font-display text-2xl text-ink">Your goals</h2>
         <Button variant="ghost" onClick={() => setEditing("new")}>
           Add a goal
         </Button>
@@ -66,7 +66,7 @@ export function GoalsView() {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-serif text-lg text-ink truncate">{r.name}</h3>
+                      <h3 className="font-display text-xl text-ink truncate">{r.name}</h3>
                       {r.complete && (
                         <span className="rounded-pill bg-gold/15 text-gold text-xs px-2 py-0.5 whitespace-nowrap">Reached</span>
                       )}

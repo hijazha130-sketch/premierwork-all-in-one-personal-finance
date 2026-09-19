@@ -40,16 +40,17 @@ export function AppShell() {
       {/* Plane 1 — the tinted canvas, furthest back (§6). */}
       <div className="wallpaper-canvas fixed inset-0 -z-10" aria-hidden />
 
-      <div className="mx-auto flex max-w-6xl">
-        {/* Plane 2 — the sidebar reads as raised chrome above the canvas (§6). */}
-        <aside className="hidden md:flex md:w-64 md:flex-col md:sticky md:top-0 md:h-screen bg-raised border-r border-hairline shadow-card px-4 py-6">
+      {/* Full-width shell: sidebar pins hard-left, content fills the rest. */}
+      <div className="flex min-h-screen w-full">
+        {/* Plane 2 — the persistent left rail; raised chrome above the canvas (§6). */}
+        <aside className="hidden md:flex md:w-[264px] md:shrink-0 md:flex-col md:sticky md:top-0 md:h-screen bg-raised border-r border-hairline shadow-card px-6 py-8">
           <Brand />
-          <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label="Primary">
+          <nav className="mt-10 flex flex-1 flex-col gap-1" aria-label="Primary">
             {NAV.map((item) => (
               <SidebarLink key={item.to} {...item} />
             ))}
           </nav>
-          <div className="mt-auto pt-6">
+          <div className="mt-auto pt-8">
             <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-2">On-device</div>
             <p className="text-xs text-muted leading-relaxed">
               All data stays on this device. Works offline.
@@ -57,9 +58,9 @@ export function AppShell() {
           </div>
         </aside>
 
-        {/* Main region */}
-        <div className="flex-1 min-w-0 pb-28 md:pb-12">
-          <header className="flex items-center justify-between gap-4 px-5 md:px-10 pt-6 md:pt-10 pb-4 border-b border-hairline">
+        {/* Main region — flexes to fill the rest of the viewport. */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <header className="flex items-center justify-between gap-4 px-6 md:px-16 pt-6 md:pt-10 pb-4 border-b border-hairline">
             <div className="md:hidden">
               <Brand compact />
             </div>
@@ -76,7 +77,8 @@ export function AppShell() {
             </div>
           </header>
 
-          <main className="px-5 md:px-10 pt-6 md:pt-8">
+          {/* Generous, wide content wrapper — never squeezed into a narrow column. */}
+          <main className="mx-auto w-full max-w-[1200px] px-6 md:px-16 py-8 pb-28 md:pb-16">
             <Outlet />
           </main>
         </div>
