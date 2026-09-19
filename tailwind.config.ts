@@ -23,6 +23,9 @@ export default {
         hairline: "rgb(var(--border-hairline) / <alpha-value>)",
         // The active wallpaper tint as a colour utility (§3): bg-wallpaper.
         wallpaper: "rgb(var(--wallpaper) / <alpha-value>)",
+        // The hero surface (dark ink card) + its text.
+        hero: "rgb(var(--hero) / <alpha-value>)",
+        "hero-text": "rgb(var(--hero-text) / <alpha-value>)",
       },
       fontFamily: {
         // Editorial titles + the single hero number (§4). Playfair Display.

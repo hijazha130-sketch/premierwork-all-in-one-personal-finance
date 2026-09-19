@@ -9,41 +9,46 @@
  * tightened later without touching any component.
  */
 @layer base {
+  /* Midnight — warm brown (the reference dark theme). Token NAMES unchanged;
+     only the values are the reference palette. */
   :root,
   [data-theme="midnight"] {
-    --surface-base: 14 14 15; /* #0E0E0F deep black */
-    --surface-raised: 26 26 28; /* #1A1A1C warm dark */
-    --surface-inset: 20 20 22;
-    --text-primary: 243 239 230; /* #F3EFE6 */
-    --text-muted: 168 162 154; /* #A8A29A */
-    --accent-gold: 200 168 96; /* #C8A860 muted gold */
+    --surface-base: 26 22 17; /* #1A1611 */
+    --surface-raised: 36 28 18; /* #241C12 */
+    --surface-inset: 46 36 23; /* #2E2417 */
+    --text-primary: 247 239 225; /* #F7EFE1 */
+    --text-muted: 184 169 136; /* #B8A988 */
+    --accent-gold: 201 160 92; /* #C9A05C */
     --positive: 127 168 138; /* #7FA88A muted sage */
     --attention: 201 138 91; /* #C98A5B muted amber */
-    --border-hairline: 42 42 45; /* #2A2A2D */
-    /* Wallpaper tint (§3): defaults to the base canvas, so "None" = today. The
-       runtime overrides this token with the chosen tint's triplet. */
+    --border-hairline: 58 47 34; /* #3A2F22 */
+    --hero: 26 22 17; /* #1A1611 */
+    --hero-text: 247 239 225; /* #F7EFE1 */
+    /* Wallpaper tint (§3): defaults to the base canvas, so "None" = today. */
     --wallpaper: var(--surface-base);
-    /* Two-part card shadow (§1). Midnight runs slightly deeper so cards still
-       lift off the dark canvas — a black shadow on black needs more strength. */
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 12px 32px rgb(0 0 0 / 0.14);
-    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.1), 0 20px 48px rgb(0 0 0 / 0.2);
+    /* Two-part card shadow (§1): warm-brown reference values. */
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.4), 0 18px 40px -16px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 
+  /* Soft — cream (the reference light theme). */
   [data-theme="soft"] {
-    --surface-base: 246 241 231; /* #F6F1E7 cream */
+    --surface-base: 247 239 225; /* #F7EFE1 */
     --surface-raised: 255 255 255; /* #FFFFFF */
-    --surface-inset: 239 232 218;
-    --text-primary: 28 26 23; /* #1C1A17 */
-    --text-muted: 107 101 92; /* #6B655C */
-    --accent-gold: 169 135 63; /* #A9873F */
+    --surface-inset: 239 230 211; /* #EFE6D3 */
+    --text-primary: 32 24 8; /* #201808 */
+    --text-muted: 107 93 72; /* #6B5D48 */
+    --accent-gold: 201 160 92; /* #C9A05C */
     --positive: 78 122 92; /* #4E7A5C */
     --attention: 176 110 59; /* #B06E3B */
-    --border-hairline: 228 220 204; /* #E4DCCC */
+    --border-hairline: 234 223 199; /* #EADFC7 */
+    --hero: 36 28 18; /* #241C12 dark ink card on cream */
+    --hero-text: 247 239 225; /* #F7EFE1 */
     --wallpaper: var(--surface-base);
-    /* Two-part card shadow (§1): tight contact + wide ambient lift. */
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 12px 32px rgb(0 0 0 / 0.1);
-    --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.06), 0 20px 48px rgb(0 0 0 / 0.14);
+    /* Two-part card shadow (§1): warm-brown reference values. */
+    --shadow: 0 1px 2px rgb(36 28 18 / 0.04), 0 8px 24px -12px rgb(36 28 18 / 0.12);
+    --shadow-lift: 0 2px 4px rgb(36 28 18 / 0.06), 0 18px 40px -16px rgb(36 28 18 / 0.22);
     color-scheme: light;
   }
 
