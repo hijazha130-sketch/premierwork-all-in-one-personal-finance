@@ -4,18 +4,33 @@
  * Transfers net correctly (out of one account, in to another) because each
  * half carries its own direction on its own account.
  */
-import type { Account, Minor, Transaction } from "@/domain/types";
+import type { Account, IsoDate, Minor, Transaction } from "@/domain/types";
 import { addMinor } from "@/lib/money";
 
-/** Balance for one account from its cleared transactions. */
-export function accountBalance(account: Account, transactions: Transaction[]): Minor {
+/**
+ * Balance for one account from its cleared transactions, as of a date. When
+ * `asOf` is given, only transactions dated on/before it count (the opening
+ * balance is always the baseline) — this is the single balance derivation both
+ * "now" and the net-worth-over-time series share. Omit `asOf` for "now".
+ */
+export function accountBalanceAsOf(
+  account: Account,
+  transactions: Transaction[],
+  asOf?: IsoDate,
+): Minor {
   let balance = account.openingBalance;
   for (const t of transactions) {
     if (t.accountId !== account.id) continue;
     if (!t.cleared) continue;
+    if (asOf != null && t.date > asOf) continue;
     balance = t.direction === "in" ? addMinor(balance, t.amount) : addMinor(balance, -t.amount);
   }
   return balance;
+}
+
+/** Balance for one account from its cleared transactions (now). */
+export function accountBalance(account: Account, transactions: Transaction[]): Minor {
+  return accountBalanceAsOf(account, transactions);
 }
 
 /** Total balance across all (non-archived) accounts. Transfers net to zero. */
