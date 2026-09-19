@@ -31,8 +31,11 @@ export function MoneyAmount({
     attention: "text-attention",
     muted: "text-muted",
   };
+  // The single hero number uses Playfair (§4); every other amount keeps the
+  // tabular serif so digits line up in columns.
+  const family = size === "hero" ? "font-display tracking-tight" : "font-amount";
   return (
-    <span className={`font-amount ${sizes[size]} ${tones[tone ?? "default"]} ${className ?? ""}`}>
+    <span className={`${family} ${sizes[size]} ${tones[tone ?? "default"]} ${className ?? ""}`}>
       {text}
     </span>
   );

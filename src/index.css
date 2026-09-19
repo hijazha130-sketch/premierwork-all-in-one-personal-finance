@@ -20,6 +20,9 @@
     --positive: 127 168 138; /* #7FA88A muted sage */
     --attention: 201 138 91; /* #C98A5B muted amber */
     --border-hairline: 42 42 45; /* #2A2A2D */
+    /* Wallpaper tint (§3): defaults to the base canvas, so "None" = today. The
+       runtime overrides this token with the chosen tint's triplet. */
+    --wallpaper: var(--surface-base);
     color-scheme: dark;
   }
 
@@ -33,6 +36,7 @@
     --positive: 78 122 92; /* #4E7A5C */
     --attention: 176 110 59; /* #B06E3B */
     --border-hairline: 228 220 204; /* #E4DCCC */
+    --wallpaper: var(--surface-base);
     color-scheme: light;
   }
 
@@ -45,14 +49,27 @@
   body {
     @apply bg-base text-ink font-sans antialiased;
     font-feature-settings: "cv01" 1;
+    /* Calm 200ms ease when the theme or tint changes (§8). The reduced-motion
+       block below neutralises this for users who ask for less motion. */
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  /* Financial numbers and headings use the serif; amounts are the hero. */
+  /*
+   * Amounts keep a TABULAR serif (Fraunces) so digits line up in columns (§4).
+   * Titles use Playfair via `font-display`; Playfair lacks tabular figures, so it
+   * is only ever used for headings and the single hero number, never a column.
+   */
   .font-amount {
-    @apply font-serif;
+    font-family: "Fraunces", "Newsreader", Georgia, serif;
     font-feature-settings: "tnum" 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /* The tinted canvas (§3, §6): one background layer behind everything. */
+  .wallpaper-canvas {
+    background: rgb(var(--wallpaper));
+    transition: background-color 0.2s ease;
   }
 
   /* Respect reduced motion (Section 4). */
@@ -74,8 +91,15 @@
 }
 
 @layer components {
+  /*
+   * The single card look (§1, §7): the raised surface, a hairline, a 16px
+   * radius, and the two-part shadow (tight contact + wide ambient) that makes it
+   * read as "floating" above the tinted canvas. Padding is set by the Card
+   * component (32px) for generous breathing room.
+   */
   .card {
-    @apply bg-raised border border-hairline rounded-card;
+    @apply bg-raised border border-hairline rounded-card shadow-card;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
   }
   .hairline {
     @apply border-hairline;

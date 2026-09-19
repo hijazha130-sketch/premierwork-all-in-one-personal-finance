@@ -22,6 +22,18 @@ export type BudgetMethod = "zeroBased" | "carryOver";
 /** How the debt payoff plan directs any extra payment (Phase 4). */
 export type DebtStrategy = "snowball" | "avalanche" | "custom";
 
+/** The background tint the user picked (Design System §3); "none" = the base canvas. */
+export type WallpaperId =
+  | "none"
+  | "sage"
+  | "dustyRose"
+  | "lavender"
+  | "sky"
+  | "sand"
+  | "pearl"
+  | "deepInk"
+  | "charcoal";
+
 /**
  * How far ahead "Safe to spend" reserves upcoming commitments (Phase 2, FD-1).
  * Default is end of the current month.
@@ -45,6 +57,10 @@ export interface Settings extends BaseRecord {
   safetyFloor: Minor; // minimum balance to protect from "Safe to spend" (default 0)
   debtStrategy: DebtStrategy; // how the extra payment is directed (default "avalanche")
   debtMonthlyExtra: Minor; // extra beyond minimums, applied by strategy (default 0)
+  // Design layer (additive, presentation-only): the chosen background tint.
+  // Optional + read with a "none" default, so existing settings rows are valid
+  // without a migration (non-destructive).
+  wallpaper?: WallpaperId;
 }
 
 export type AccountType =

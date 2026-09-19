@@ -1,7 +1,9 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useTheme } from "@/state/ThemeProvider";
 import { useCapture } from "@/state/CaptureProvider";
+import { useData } from "@/state/dataContext";
+import { applyWallpaper } from "@/lib/wallpapers";
 import { Segmented } from "@/components/ui";
 import { QuickCapture } from "@/screens/QuickCapture";
 
@@ -24,13 +26,23 @@ const NAV = [
 export function AppShell() {
   const { theme, setTheme } = useTheme();
   const { openCapture } = useCapture();
+  const { settings } = useData();
   const location = useLocation();
+
+  // The tinted canvas (§3): apply the chosen tint for the active theme. "None"
+  // (the default) removes the override, so the canvas is the base surface.
+  useEffect(() => {
+    applyWallpaper(settings?.wallpaper ?? "none", theme);
+  }, [settings?.wallpaper, theme]);
 
   return (
     <div className="min-h-full bg-base">
+      {/* Plane 1 — the tinted canvas, furthest back (§6). */}
+      <div className="wallpaper-canvas fixed inset-0 -z-10" aria-hidden />
+
       <div className="mx-auto flex max-w-6xl">
-        {/* Desktop sidebar */}
-        <aside className="hidden md:flex md:w-64 md:flex-col md:sticky md:top-0 md:h-screen border-r border-hairline px-4 py-6">
+        {/* Plane 2 — the sidebar reads as raised chrome above the canvas (§6). */}
+        <aside className="hidden md:flex md:w-64 md:flex-col md:sticky md:top-0 md:h-screen bg-raised border-r border-hairline shadow-card px-4 py-6">
           <Brand />
           <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label="Primary">
             {NAV.map((item) => (
@@ -47,7 +59,7 @@ export function AppShell() {
 
         {/* Main region */}
         <div className="flex-1 min-w-0 pb-28 md:pb-12">
-          <header className="flex items-center justify-between gap-4 px-5 md:px-10 pt-6 md:pt-10">
+          <header className="flex items-center justify-between gap-4 px-5 md:px-10 pt-6 md:pt-10 pb-4 border-b border-hairline">
             <div className="md:hidden">
               <Brand compact />
             </div>
@@ -143,7 +155,7 @@ function SidebarLink({
       end={end}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-control px-4 py-3 text-sm font-medium transition-colors ${
-          isActive ? "bg-inset text-ink" : "text-muted hover:text-ink hover:bg-inset/60"
+          isActive ? "bg-gold/10 text-gold" : "text-muted hover:text-ink hover:bg-inset/60"
         }`
       }
     >

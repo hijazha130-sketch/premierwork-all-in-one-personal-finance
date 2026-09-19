@@ -6,6 +6,7 @@ import { getDB } from "@/data/db";
 import { downloadBackup, importDatabaseString } from "@/data/backup";
 import { Button, Card, SectionTitle, Segmented } from "@/components/ui";
 import { minorToMajor, parseMajorToMinor } from "@/lib/money";
+import { WALLPAPERS } from "@/lib/wallpapers";
 
 /**
  * More (Section 5 & 8). The hub: manage accounts, groups and people; re-run
@@ -66,6 +67,32 @@ export function More() {
             { value: "midnight", label: "Midnight" },
           ]}
         />
+
+        <div className="mt-6">
+          <div className="text-sm font-medium text-ink mb-1">Background</div>
+          <p className="text-muted text-sm mb-3">A soft tint behind everything. It stays gentle so your cards keep their glow.</p>
+          <div className="flex flex-wrap gap-3">
+            {WALLPAPERS.map((w) => {
+              const triplet = theme === "midnight" ? w.dark : w.soft;
+              const swatch = triplet ? `rgb(${triplet})` : "rgb(var(--surface-base))";
+              const active = (settings?.wallpaper ?? "none") === w.id;
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => repo.saveSettings({ wallpaper: w.id })}
+                  aria-label={w.label}
+                  aria-pressed={active}
+                  title={w.label}
+                  className={`h-10 w-10 rounded-full border transition-shadow ${
+                    active ? "border-gold ring-2 ring-gold ring-offset-2 ring-offset-raised" : "border-hairline"
+                  }`}
+                  style={{ background: swatch }}
+                />
+              );
+            })}
+          </div>
+        </div>
       </Card>
 
       <Card>

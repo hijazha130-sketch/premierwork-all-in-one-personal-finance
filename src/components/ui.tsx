@@ -29,7 +29,9 @@ export function Button({
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("card p-6", className)}>{children}</div>;
+  // 32px padding (§7) for generous breathing room; the .card utility carries the
+  // surface, hairline, radius and two-part shadow.
+  return <div className={cx("card p-8", className)}>{children}</div>;
 }
 
 export function SectionTitle({ overline, title, subtitle }: { overline?: string; title: string; subtitle?: string }) {
@@ -38,7 +40,7 @@ export function SectionTitle({ overline, title, subtitle }: { overline?: string;
       {overline && (
         <div className="text-xs font-semibold uppercase tracking-widest text-gold mb-2">{overline}</div>
       )}
-      <h1 className="font-serif text-3xl md:text-4xl text-ink leading-tight">{title}</h1>
+      <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{title}</h1>
       {subtitle && <p className="text-muted mt-3 max-w-md">{subtitle}</p>}
     </div>
   );

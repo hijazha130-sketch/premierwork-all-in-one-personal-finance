@@ -23,6 +23,9 @@ export default {
         hairline: "rgb(var(--border-hairline) / <alpha-value>)",
       },
       fontFamily: {
+        // Editorial titles + the single hero number (§4). Playfair Display.
+        display: ['"Playfair Display"', "Georgia", "serif"],
+        // Amounts keep the tabular serif (Fraunces) so columns line up.
         serif: ["Fraunces", "Newsreader", "Georgia", "serif"],
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
@@ -38,14 +41,18 @@ export default {
       },
       borderRadius: {
         control: "8px",
-        card: "12px",
+        card: "16px", // §5: 12 -> 16 for a softer, more premium card
+        xl: "20px",
         pill: "999px",
       },
       fontFeatureSettings: {
         tabular: '"tnum" 1, "cv01" 1',
       },
       boxShadow: {
-        card: "0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06)",
+        // §1 the two-part shadow: tight contact (anchors the edge) + wide ambient
+        // (the lift). One without the other looks wrong.
+        card: "0 1px 2px rgb(0 0 0 / 0.05), 0 12px 32px rgb(0 0 0 / 0.10)",
+        lift: "0 2px 4px rgb(0 0 0 / 0.06), 0 20px 48px rgb(0 0 0 / 0.14)",
         sheet: "0 -8px 40px rgb(0 0 0 / 0.24)",
       },
     },

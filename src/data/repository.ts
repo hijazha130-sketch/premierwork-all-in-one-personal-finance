@@ -92,6 +92,7 @@ export class FinanceRepository {
       safetyFloor: 0,
       debtStrategy: "avalanche",
       debtMonthlyExtra: 0,
+      wallpaper: "none",
       ...patch,
     });
     await this.db.settings.put(created);
